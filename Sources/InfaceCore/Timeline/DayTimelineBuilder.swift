@@ -124,7 +124,7 @@ public enum DayTimelineBuilder {
 
     public static func hours(from start: Date, to end: Date, calendar: Calendar = .current) -> [Date] {
         var result: [Date] = []
-        var components = calendar.dateComponents([.year, .month, .day, .hour], from: start)
+        let components = calendar.dateComponents([.year, .month, .day, .hour], from: start)
         guard var cursor = calendar.date(from: components) else { return [] }
         if cursor < start {
             cursor = calendar.date(byAdding: .hour, value: 1, to: cursor) ?? cursor

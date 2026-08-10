@@ -25,6 +25,10 @@ struct MenuBarView: View {
                         onJoin: {
                             _ = model.joinMeeting(for: selectedEvent)
                             MenuBarPopoverDismisser.dismiss()
+                        },
+                        onOpenLink: { url in
+                            _ = model.openLink(url)
+                            MenuBarPopoverDismisser.dismiss()
                         }
                     )
                     .transition(.asymmetric(
@@ -162,6 +166,7 @@ struct EventDetailView: View {
     let event: MeetingEvent
     let onBack: () -> Void
     let onJoin: () -> Void
+    let onOpenLink: (URL) -> Void
     private let detector = MeetingLinkDetector.shared
 
     var body: some View {
@@ -190,10 +195,23 @@ struct EventDetailView: View {
                         detailBlock(title: "Календарь", value: event.calendarTitle)
                     }
                     if let location = event.location, !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        detailBlock(title: "Место", value: location)
+                        linkAwareBlock(title: "Место", text: location)
                     }
                     if let url = detector.detect(in: event) {
-                        detailBlock(title: "Ссылка", value: url.absoluteString)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Ссылка")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(InfaceTheme.textSecondary)
+                            Button(url.absoluteString) {
+                                onOpenLink(url)
+                            }
+                            .buttonStyle(.plain)
+                            .font(.body)
+                            .foregroundStyle(InfaceTheme.accent)
+                            .underline()
+                            .multilineTextAlignment(.leading)
+                            .textSelection(.enabled)
+                        }
                         Button(action: onJoin) {
                             Text("Подключиться")
                                 .font(.headline)
@@ -210,10 +228,13 @@ struct EventDetailView: View {
                             Text("Заметки")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(InfaceTheme.textSecondary)
-                            Text(notes)
-                                .font(.body)
-                                .foregroundStyle(InfaceTheme.textPrimary)
-                                .textSelection(.enabled)
+                            Text(Linkifier.attributedString(from: notes))
+                            .font(.body)
+                            .textSelection(.enabled)
+                            .environment(\.openURL, OpenURLAction { url in
+                                onOpenLink(url)
+                                return .handled
+                            })
                         }
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -236,6 +257,21 @@ struct EventDetailView: View {
                 .font(.body)
                 .foregroundStyle(InfaceTheme.textPrimary)
                 .textSelection(.enabled)
+        }
+    }
+
+    private func linkAwareBlock(title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(InfaceTheme.textSecondary)
+            Text(Linkifier.attributedString(from: text))
+            .font(.body)
+            .textSelection(.enabled)
+            .environment(\.openURL, OpenURLAction { url in
+                onOpenLink(url)
+                return .handled
+            })
         }
     }
 

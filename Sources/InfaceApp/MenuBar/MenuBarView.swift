@@ -116,30 +116,16 @@ struct MenuBarView: View {
             }
             .padding(.horizontal, 16)
         case .authorized:
-            if model.todaysRemainingEvents.isEmpty {
-                Text("На сегодня больше нет встреч")
-                    .foregroundStyle(InfaceTheme.textSecondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.horizontal, 16)
-            } else {
-                eventList
-            }
-        }
-    }
-
-    private var eventList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 8) {
-                ForEach(model.todaysRemainingEvents) { event in
-                    EventRow(event: event) {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            selectedEvent = event
-                        }
+            DayTimelineView(
+                timeline: DayTimelineBuilder.build(events: model.todaysRemainingEvents),
+                now: Date(),
+                onSelect: { event in
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        selectedEvent = event
                     }
                 }
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            )
+            .padding(.top, 4)
         }
     }
 
@@ -169,67 +155,6 @@ struct MenuBarView: View {
                 .tint(InfaceTheme.accent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct EventRow: View {
-    let event: MeetingEvent
-    let onSelect: () -> Void
-    private let detector = MeetingLinkDetector.shared
-
-    var body: some View {
-        Button(action: onSelect) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .top) {
-                    Text(event.title)
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(InfaceTheme.textPrimary)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-                    Spacer(minLength: 8)
-                    if event.isOngoing {
-                        Text("сейчас")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(InfaceTheme.accent)
-                    }
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(InfaceTheme.textSecondary.opacity(0.7))
-                }
-                Text(timeLabel)
-                    .font(.caption)
-                    .foregroundStyle(InfaceTheme.textSecondary)
-                HStack(spacing: 8) {
-                    if !event.calendarTitle.isEmpty {
-                        Text(event.calendarTitle)
-                            .font(.caption2)
-                            .foregroundStyle(InfaceTheme.textSecondary.opacity(0.85))
-                            .lineLimit(1)
-                    }
-                    if detector.detect(in: event) != nil {
-                        Text("есть ссылка")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(InfaceTheme.accent)
-                    }
-                }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(InfaceTheme.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Показать подробности")
-    }
-
-    private var timeLabel: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "HH:mm"
-        let start = formatter.string(from: event.startDate)
-        let end = formatter.string(from: event.endDate)
-        return "\(start)–\(end)"
     }
 }
 

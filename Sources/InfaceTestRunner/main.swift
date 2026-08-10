@@ -186,6 +186,15 @@ func appModelFunctionalTests() -> Int {
     dayModel.start()
     f += expect(dayModel.todaysRemainingEvents.map(\.id) == ["now", "later"], "today filter")
 
+    let timeline = DayTimelineBuilder.build(
+        events: [past, ongoing, later],
+        now: now
+    )
+    f += expect(timeline.meetings.map(\.id) == ["now", "later"], "timeline meetings")
+    f += expect(timeline.intervals.contains(where: {
+        if case .free = $0.kind { return $0.duration > 0 } else { return false }
+    }), "timeline has free gap")
+
     model.forceAlert(event)
     f += expect(model.activeAlert?.id == "fx1", "force alert")
 

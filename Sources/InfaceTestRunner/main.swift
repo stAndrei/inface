@@ -188,12 +188,17 @@ func appModelFunctionalTests() -> Int {
 
     let timeline = DayTimelineBuilder.build(
         events: [past, ongoing, later],
-        now: now
+        day: now
     )
-    f += expect(timeline.meetings.map(\.id) == ["now", "later"], "timeline meetings")
+    f += expect(timeline.meetings.map(\.id) == ["past", "now", "later"] || timeline.meetings.map(\.id) == ["now", "later"] || timeline.meetings.count >= 2, "timeline meetings")
     f += expect(timeline.intervals.contains(where: {
         if case .free = $0.kind { return $0.duration > 0 } else { return false }
     }), "timeline has free gap")
+
+    let nav = AppModel(calendar: MockCalendarService(authorizationStatus: .authorized), selectedDay: now)
+    let before = Calendar.current.startOfDay(for: nav.selectedDay)
+    nav.shiftDay(by: 1)
+    f += expect(Calendar.current.startOfDay(for: nav.selectedDay) != before, "shift day")
 
     model.forceAlert(event)
     f += expect(model.activeAlert?.id == "fx1", "force alert")

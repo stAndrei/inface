@@ -25,7 +25,7 @@ final class DayTimelineBuilderTests: XCTestCase {
             calendarTitle: "Work"
         )
 
-        let timeline = DayTimelineBuilder.build(events: [a, b], now: now, calendar: calendar)
+        let timeline = DayTimelineBuilder.build(events: [a, b], day: day, now: now, calendar: calendar)
         XCTAssertEqual(timeline.meetings.map(\.id), ["a", "b"])
 
         let kinds = timeline.intervals.map { interval -> String in
@@ -34,31 +34,44 @@ final class DayTimelineBuilderTests: XCTestCase {
             case .meeting(let e): return "m:\(e.id)"
             }
         }
+        // Visible starts at 08:00 workday → free 8-10, A, free 11-13, B, free to midnight
         XCTAssertEqual(kinds, ["free", "m:a", "free", "m:b", "free"])
-        XCTAssertEqual(timeline.intervals[0].duration, 60 * 60, accuracy: 0.1)
+        XCTAssertEqual(timeline.intervals[0].duration, 2 * 60 * 60, accuracy: 0.1)
         XCTAssertEqual(timeline.intervals[2].duration, 2 * 60 * 60, accuracy: 0.1)
     }
 
-    func testExcludesPastMeetings() {
+    func testOtherDayIncludesFullSchedule() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let day = calendar.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: 0))!
-        let now = calendar.date(byAdding: .hour, value: 12, to: day)!
-        let past = MeetingEvent(
-            id: "past",
-            title: "Past",
+        let day = calendar.date(from: DateComponents(year: 2026, month: 8, day: 11, hour: 0))!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: 12))!
+        let meeting = MeetingEvent(
+            id: "m",
+            title: "Tomorrow",
             startDate: calendar.date(byAdding: .hour, value: 9, to: day)!,
             endDate: calendar.date(byAdding: .hour, value: 10, to: day)!,
             calendarId: "c",
             calendarTitle: "Work"
         )
-        let timeline = DayTimelineBuilder.build(events: [past], now: now, calendar: calendar)
-        XCTAssertTrue(timeline.meetings.isEmpty)
-        XCTAssertEqual(timeline.intervals.count, 1)
-        if case .free = timeline.intervals[0].kind {
-            XCTAssertGreaterThan(timeline.intervals[0].duration, 0)
-        } else {
-            XCTFail("expected free interval")
-        }
+        let timeline = DayTimelineBuilder.build(events: [meeting], day: day, now: now, calendar: calendar)
+        XCTAssertFalse(timeline.isToday)
+        XCTAssertEqual(timeline.meetings.map(\.id), ["m"])
+    }
+}
+
+@MainActor
+final class DayNavigationTests: XCTestCase {
+    func testShiftDayChangesSelection() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let day = calendar.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: 0))!
+        let model = AppModel(
+            calendar: MockCalendarService(authorizationStatus: .authorized),
+            selectedDay: day
+        )
+        model.shiftDay(by: 1)
+        XCTAssertEqual(Calendar.current.startOfDay(for: model.selectedDay), calendar.date(byAdding: .day, value: 1, to: day)!)
+        model.goToToday()
+        XCTAssertTrue(Calendar.current.isDateInToday(model.selectedDay))
     }
 }

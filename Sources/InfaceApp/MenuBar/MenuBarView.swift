@@ -9,8 +9,12 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 14)
+
+            daySwitcher
+                .padding(.horizontal, 18)
                 .padding(.bottom, 12)
 
             Group {
@@ -47,49 +51,99 @@ struct MenuBarView: View {
 
             if selectedEvent == nil {
                 footer
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
             }
         }
-        .frame(width: 440, height: 620)
+        .frame(width: 520, height: 740)
         .background(InfaceTheme.background)
         .opacity(appeared ? 1 : 0)
         .onAppear {
             model.start()
             withAnimation(.easeOut(duration: 0.2)) { appeared = true }
         }
+        .onChange(of: model.selectedDay) { _, _ in
+            selectedEvent = nil
+        }
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Inface")
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
-                    .foregroundStyle(InfaceTheme.textPrimary)
-                Text(daySubtitle)
-                    .font(.caption)
-                    .foregroundStyle(InfaceTheme.textSecondary)
-            }
+        HStack(alignment: .center) {
+            Text("Inface")
+                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                .foregroundStyle(InfaceTheme.textPrimary)
             Spacer()
             if model.settings.alertsPaused {
                 Text("Пауза")
-                    .font(.caption.weight(.semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(InfaceTheme.accent)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
                     .background(InfaceTheme.accent.opacity(0.15))
                     .clipShape(Capsule())
             }
         }
     }
 
-    private var daySubtitle: String {
+    private var daySwitcher: some View {
+        HStack(spacing: 12) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    model.shiftDay(by: -1)
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 40, height: 40)
+                    .background(InfaceTheme.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(InfaceTheme.textPrimary)
+            .help("Предыдущий день")
+
+            VStack(spacing: 4) {
+                Text(dayTitle)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(InfaceTheme.textPrimary)
+                Text(daySubtitle)
+                    .font(.callout)
+                    .foregroundStyle(InfaceTheme.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    model.shiftDay(by: 1)
+                }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 40, height: 40)
+                    .background(InfaceTheme.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(InfaceTheme.textPrimary)
+            .help("Следующий день")
+        }
+    }
+
+    private var dayTitle: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
+        if model.isSelectedDayToday {
+            formatter.dateFormat = "EEEE, d MMMM"
+            return "Сегодня · \(formatter.string(from: model.selectedDay).capitalized)"
+        }
         formatter.dateFormat = "EEEE, d MMMM"
-        let count = model.todaysRemainingEvents.count
-        let meetings = count == 0 ? "нет встреч" : "\(count) \(meetingsWord(count))"
-        return "\(formatter.string(from: Date()).capitalized) · \(meetings) до конца дня"
+        return formatter.string(from: model.selectedDay).capitalized
+    }
+
+    private var daySubtitle: String {
+        let count = model.selectedDayEvents.count
+        if count == 0 { return "нет встреч" }
+        return "\(count) \(meetingsWord(count))"
     }
 
     private func meetingsWord(_ n: Int) -> String {
@@ -110,7 +164,7 @@ struct MenuBarView: View {
             ) {
                 Task { await model.requestAccess() }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
         case .denied, .restricted:
             emptyState(
                 title: "Нет доступа к Календарю",
@@ -118,10 +172,13 @@ struct MenuBarView: View {
             ) {
                 model.openSystemCalendarPrivacy()
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
         case .authorized:
             DayTimelineView(
-                timeline: DayTimelineBuilder.build(events: model.todaysRemainingEvents),
+                timeline: DayTimelineBuilder.build(
+                    events: model.selectedDayEvents,
+                    day: model.selectedDay
+                ),
                 now: Date(),
                 onSelect: { event in
                     withAnimation(.easeInOut(duration: 0.18)) {
@@ -129,34 +186,50 @@ struct MenuBarView: View {
                     }
                 }
             )
-            .padding(.top, 4)
+            .padding(.top, 2)
         }
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 16) {
             Button(model.settings.alertsPaused ? "Возобновить" : "Пауза") {
                 model.togglePause()
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            .font(.body.weight(.semibold))
             .foregroundStyle(InfaceTheme.accent)
+
+            if !model.isSelectedDayToday {
+                Button("Сегодня") {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        model.goToToday()
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(InfaceTheme.textPrimary)
+            }
+
             Spacer()
+
             Button("Обновить") {
                 model.reloadEvents()
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            .font(.body.weight(.medium))
             .foregroundStyle(InfaceTheme.textSecondary)
         }
-        .font(.caption)
     }
 
     private func emptyState(title: String, button: String, action: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             Text(title)
+                .font(.title3)
                 .foregroundStyle(InfaceTheme.textSecondary)
             Button(button, action: action)
                 .buttonStyle(.borderedProminent)
                 .tint(InfaceTheme.accent)
+                .controlSize(.large)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -172,21 +245,21 @@ struct EventDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: onBack) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "chevron.left")
                     Text("К списку")
                 }
-                .font(.caption.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(InfaceTheme.accent)
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 18)
+            .padding(.bottom, 14)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(event.title)
-                        .font(.system(.title2, design: .rounded).weight(.semibold))
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
                         .foregroundStyle(InfaceTheme.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -198,15 +271,15 @@ struct EventDetailView: View {
                         linkAwareBlock(title: "Место", text: location)
                     }
                     if let url = detector.detect(in: event) {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text("Ссылка")
-                                .font(.caption.weight(.semibold))
+                                .font(.callout.weight(.semibold))
                                 .foregroundStyle(InfaceTheme.textSecondary)
                             Button(url.absoluteString) {
                                 onOpenLink(url)
                             }
                             .buttonStyle(.plain)
-                            .font(.body)
+                            .font(.title3)
                             .foregroundStyle(InfaceTheme.accent)
                             .underline()
                             .multilineTextAlignment(.leading)
@@ -214,32 +287,32 @@ struct EventDetailView: View {
                         }
                         Button(action: onJoin) {
                             Text("Подключиться")
-                                .font(.headline)
+                                .font(.title3.weight(.semibold))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
+                                .padding(.vertical, 14)
                                 .background(InfaceTheme.accent)
                                 .foregroundStyle(Color.black.opacity(0.85))
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
                     }
                     if let notes = event.notes, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text("Заметки")
-                                .font(.caption.weight(.semibold))
+                                .font(.callout.weight(.semibold))
                                 .foregroundStyle(InfaceTheme.textSecondary)
                             Text(Linkifier.attributedString(from: notes))
-                            .font(.body)
+                            .font(.title3)
                             .textSelection(.enabled)
                             .environment(\.openURL, OpenURLAction { url in
                                 onOpenLink(url)
                                 return .handled
                             })
                         }
-                        .padding(12)
+                        .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(InfaceTheme.backgroundSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                 }
                 .padding(.horizontal, 16)
@@ -249,24 +322,24 @@ struct EventDetailView: View {
     }
 
     private func detailBlock(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(InfaceTheme.textSecondary)
             Text(value)
-                .font(.body)
+                .font(.title3)
                 .foregroundStyle(InfaceTheme.textPrimary)
                 .textSelection(.enabled)
         }
     }
 
     private func linkAwareBlock(title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(InfaceTheme.textSecondary)
             Text(Linkifier.attributedString(from: text))
-            .font(.body)
+            .font(.title3)
             .textSelection(.enabled)
             .environment(\.openURL, OpenURLAction { url in
                 onOpenLink(url)

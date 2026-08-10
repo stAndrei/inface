@@ -6,6 +6,7 @@ import Foundation
 public final class AppModel: ObservableObject {
     @Published public private(set) var authStatus: CalendarAuthStatus
     @Published public private(set) var events: [MeetingEvent] = []
+    @Published public var selectedDay: Date
     @Published public var settings: AppSettings {
         didSet { scheduler.updateSettings(settings) }
     }
@@ -25,7 +26,8 @@ public final class AppModel: ObservableObject {
         scheduler: AlertScheduler = AlertScheduler(),
         linkDetector: MeetingLinkDetector = .shared,
         linkOpener: LinkOpening = WorkspaceLinkOpener(),
-        settings: AppSettings = .default
+        settings: AppSettings = .default,
+        selectedDay: Date = Date()
     ) {
         self.calendar = calendar
         self.scheduler = scheduler
@@ -33,6 +35,7 @@ public final class AppModel: ObservableObject {
         self.linkOpener = linkOpener
         self.settings = settings
         self.authStatus = calendar.authorizationStatus
+        self.selectedDay = Calendar.current.startOfDay(for: selectedDay)
         self.scheduler.updateSettings(settings)
         self.scheduler.onFire = { [weak self] event in
             Task { @MainActor in
@@ -41,7 +44,23 @@ public final class AppModel: ObservableObject {
         }
     }
 
-    /// Remaining meetings for today (ongoing + until end of day), sorted by start.
+    public var isSelectedDayToday: Bool {
+        Calendar.current.isDateInToday(selectedDay)
+    }
+
+    /// Meetings overlapping the currently selected day.
+    public var selectedDayEvents: [MeetingEvent] {
+        let cal = Calendar.current
+        let dayStart = cal.startOfDay(for: selectedDay)
+        guard let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else {
+            return events
+        }
+        return events
+            .filter { $0.startDate < dayEnd && $0.endDate > dayStart }
+            .sorted { $0.startDate < $1.startDate }
+    }
+
+    /// Remaining meetings for today (alerts / compatibility).
     public var todaysRemainingEvents: [MeetingEvent] {
         let cal = Calendar.current
         let now = Date()
@@ -50,11 +69,21 @@ public final class AppModel: ObservableObject {
             return events
         }
         return events
-            .filter { event in
-                // overlaps today and has not ended yet
-                event.startDate < dayEnd && event.endDate > now
-            }
+            .filter { $0.startDate < dayEnd && $0.endDate > now }
             .sorted { $0.startDate < $1.startDate }
+    }
+
+    public func shiftDay(by value: Int) {
+        let cal = Calendar.current
+        if let next = cal.date(byAdding: .day, value: value, to: selectedDay) {
+            selectedDay = cal.startOfDay(for: next)
+            reloadEvents()
+        }
+    }
+
+    public func goToToday() {
+        selectedDay = Calendar.current.startOfDay(for: Date())
+        reloadEvents()
     }
 
     public func start() {
@@ -93,12 +122,13 @@ public final class AppModel: ObservableObject {
         }
         let cal = Calendar.current
         let now = Date()
-        let dayStart = cal.startOfDay(for: now)
-        let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) ?? now.addingTimeInterval(24 * 3600)
-        let fetchEnd = max(dayEnd, now.addingTimeInterval(schedulerHorizon))
+        let selectedStart = cal.startOfDay(for: selectedDay)
+        let selectedEnd = cal.date(byAdding: .day, value: 1, to: selectedStart) ?? selectedStart.addingTimeInterval(24 * 3600)
+        let todayStart = cal.startOfDay(for: now)
+        let fetchStart = min(selectedStart, todayStart)
+        let fetchEnd = max(selectedEnd, now.addingTimeInterval(schedulerHorizon))
         do {
-            // From start of day so ongoing morning meetings are included.
-            events = try calendar.fetchEvents(from: dayStart, to: fetchEnd)
+            events = try calendar.fetchEvents(from: fetchStart, to: fetchEnd)
             scheduler.updateEvents(events.filter { $0.endDate > now })
             lastError = nil
         } catch {

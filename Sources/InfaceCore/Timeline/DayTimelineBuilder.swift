@@ -27,13 +27,22 @@ public struct DayTimelineModel: Equatable, Sendable {
     public let visibleStart: Date
     public let intervals: [DayTimelineInterval]
     public let meetings: [MeetingEvent]
+    public let isToday: Bool
 
-    public init(dayStart: Date, dayEnd: Date, visibleStart: Date, intervals: [DayTimelineInterval], meetings: [MeetingEvent]) {
+    public init(
+        dayStart: Date,
+        dayEnd: Date,
+        visibleStart: Date,
+        intervals: [DayTimelineInterval],
+        meetings: [MeetingEvent],
+        isToday: Bool
+    ) {
         self.dayStart = dayStart
         self.dayEnd = dayEnd
         self.visibleStart = visibleStart
         self.intervals = intervals
         self.meetings = meetings
+        self.isToday = isToday
     }
 
     public var visibleDuration: TimeInterval {
@@ -42,18 +51,19 @@ public struct DayTimelineModel: Equatable, Sendable {
 }
 
 public enum DayTimelineBuilder {
-    /// Builds a day timeline from `visibleStart` (usually now) to end of day,
-    /// inserting free gaps between remaining meetings.
+    /// Builds a day timeline for `day`, with free gaps between meetings.
     public static func build(
         events: [MeetingEvent],
+        day: Date,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> DayTimelineModel {
-        let dayStart = calendar.startOfDay(for: now)
-        let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? now.addingTimeInterval(24 * 3600)
+        let dayStart = calendar.startOfDay(for: day)
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart.addingTimeInterval(24 * 3600)
+        let isToday = calendar.isDate(dayStart, inSameDayAs: now)
 
         let meetings = events
-            .filter { $0.startDate < dayEnd && $0.endDate > now }
+            .filter { $0.startDate < dayEnd && $0.endDate > dayStart }
             .map { event in
                 MeetingEvent(
                     id: event.id,
@@ -70,10 +80,13 @@ public enum DayTimelineBuilder {
             .filter { $0.endDate > $0.startDate }
             .sorted { $0.startDate < $1.startDate }
 
-        // Start timeline at the beginning of the current hour (Calendar-like),
-        // but not before day start.
-        let hour = calendar.dateComponents([.year, .month, .day, .hour], from: now)
-        let visibleStart = calendar.date(from: hour) ?? now
+        let workdayStart = calendar.date(bySettingHour: 8, minute: 0, second: 0, of: dayStart) ?? dayStart
+        let firstMeetingStart = meetings.map(\.startDate).min()
+        var visibleStart = workdayStart
+        if let firstMeetingStart {
+            visibleStart = min(workdayStart, firstMeetingStart)
+        }
+        visibleStart = max(visibleStart, dayStart)
 
         var cursor = visibleStart
         var intervals: [DayTimelineInterval] = []
@@ -84,7 +97,7 @@ public enum DayTimelineBuilder {
             if meetingStart > cursor {
                 intervals.append(
                     DayTimelineInterval(
-                        id: "free-\(cursor.timeIntervalSince1970)",
+                        id: "free-\(cursor.timeIntervalSince1970)-\(meeting.id)",
                         start: cursor,
                         end: meetingStart,
                         kind: .free
@@ -118,7 +131,8 @@ public enum DayTimelineBuilder {
             dayEnd: dayEnd,
             visibleStart: visibleStart,
             intervals: intervals,
-            meetings: meetings
+            meetings: meetings,
+            isToday: isToday
         )
     }
 

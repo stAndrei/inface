@@ -109,9 +109,6 @@ struct DayTimelineView: View {
                                 .foregroundStyle(InfaceTheme.accent)
                         }
                     }
-                    Text(timeRange(event))
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(InfaceTheme.textSecondary)
                     if h >= 58, item.columnCount == 1 {
                         HStack(spacing: 8) {
                             if !event.calendarTitle.isEmpty {
@@ -176,12 +173,5 @@ struct DayTimelineView: View {
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
-    }
-
-    private func timeRange(_ event: MeetingEvent) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "HH:mm"
-        return "\(formatter.string(from: event.startDate))–\(formatter.string(from: event.endDate))"
     }
 }

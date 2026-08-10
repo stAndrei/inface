@@ -1,0 +1,27 @@
+schema: spec-driven
+
+context: |
+  Product: Inface — macOS 14+ menu-bar meeting reminder (RU UI).
+  Stack: SwiftUI + AppKit + EventKit via SPM Package.swift.
+  MVP changes only: bootstrap-mac-app, add-eventkit-sync, add-fullscreen-alerts, add-meeting-link-join.
+  Calendars via EventKit (Exchange if in Calendar.app). Lead time default 1 minute.
+  Closed-loop: BA writes tasks; Dev implements; 5 reviewers; Tester unit+functional.
+  Coverage ≥70% on new Core code. Local git only.
+
+rules:
+  proposal:
+    - Include Non-goals
+    - RU product copy references where UI is affected
+  tasks:
+    - Each task is a slice with assignee, acceptance, reviewers, tests
+    - Max one developer slice at a time in the loop
+
+operations:
+  apply:
+    guidance:
+      - Follow tasks.md order; mark [x] when done
+      - Do not expand past MVP
+  archive:
+    guidance:
+      - Merge delta specs into openspec/specs
+      - Local git commit after archive

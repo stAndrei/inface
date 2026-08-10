@@ -13,9 +13,11 @@ struct MenuBarView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 14)
 
-            daySwitcher
-                .padding(.horizontal, 18)
-                .padding(.bottom, 12)
+            if selectedEvent == nil {
+                daySwitcher
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 12)
+            }
 
             Group {
                 if let selectedEvent {

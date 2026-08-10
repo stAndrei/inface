@@ -16,6 +16,9 @@ rm -rf "$ROOT/dist/Inface.app"
 mkdir -p "$DIST/MacOS" "$DIST/Resources"
 cp "$BIN" "$DIST/MacOS/Inface"
 cp "$ROOT/Sources/InfaceApp/Info.plist" "$DIST/Info.plist"
+if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
+  cp "$ROOT/Resources/AppIcon.icns" "$DIST/Resources/AppIcon.icns"
+fi
 chmod +x "$DIST/MacOS/Inface"
 
 # Ad-hoc sign so TCC/Calendar prompts work more reliably for local .app

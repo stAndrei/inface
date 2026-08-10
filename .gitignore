@@ -5,3 +5,4 @@ DerivedData/
 *.xcodeproj
 .swiftpm/
 .DS_Store
+Resources/AppIcon.iconset/

@@ -62,16 +62,14 @@ final class DayTimelineBuilderTests: XCTestCase {
 @MainActor
 final class DayNavigationTests: XCTestCase {
     func testShiftDayChangesSelection() {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let day = calendar.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: 0))!
-        let model = AppModel(
-            calendar: MockCalendarService(authorizationStatus: .authorized),
-            selectedDay: day
-        )
+        let model = AppModel(calendar: MockCalendarService(authorizationStatus: .authorized))
+        let before = model.selectedDay
         model.shiftDay(by: 1)
-        XCTAssertEqual(Calendar.current.startOfDay(for: model.selectedDay), calendar.date(byAdding: .day, value: 1, to: day)!)
+        XCTAssertEqual(
+            Calendar.current.dateComponents([.day], from: before, to: model.selectedDay).day,
+            1
+        )
         model.goToToday()
-        XCTAssertTrue(Calendar.current.isDateInToday(model.selectedDay))
+        XCTAssertTrue(model.isSelectedDayToday)
     }
 }

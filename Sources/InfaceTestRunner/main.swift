@@ -167,7 +167,24 @@ func appModelFunctionalTests() -> Int {
     let model = AppModel(calendar: MockCalendarService(events: [event]))
     model.start()
     f += expect(model.events.count == 1, "events loaded")
+    f += expect(model.todaysRemainingEvents.count == 1, "today remaining")
     f += expect(model.events.first?.title == "Обзор спринта", "title")
+
+    let past = MeetingEvent(
+        id: "past", title: "Утро", startDate: now.addingTimeInterval(-7200),
+        endDate: now.addingTimeInterval(-3600), calendarId: "c", calendarTitle: "Work"
+    )
+    let ongoing = MeetingEvent(
+        id: "now", title: "Сейчас", startDate: now.addingTimeInterval(-600),
+        endDate: now.addingTimeInterval(1800), calendarId: "c", calendarTitle: "Work"
+    )
+    let later = MeetingEvent(
+        id: "later", title: "Вечер", startDate: now.addingTimeInterval(3600),
+        endDate: now.addingTimeInterval(5400), calendarId: "c", calendarTitle: "Work"
+    )
+    let dayModel = AppModel(calendar: MockCalendarService(events: [past, ongoing, later]))
+    dayModel.start()
+    f += expect(dayModel.todaysRemainingEvents.map(\.id) == ["now", "later"], "today filter")
 
     model.forceAlert(event)
     f += expect(model.activeAlert?.id == "fx1", "force alert")

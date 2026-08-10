@@ -17,11 +17,44 @@ final class AppModelFunctionalTests: XCTestCase {
         let opener = MockLinkOpener()
         let model = AppModel(calendar: MockCalendarService(events: [event]), linkOpener: opener)
         model.start()
+        XCTAssertEqual(model.events.count, 1)
+        XCTAssertEqual(model.todaysRemainingEvents.count, 1)
         XCTAssertEqual(model.events.first?.title, "Обзор спринта")
         XCTAssertTrue(model.joinMeeting(for: event))
         XCTAssertEqual(opener.opened.count, 1)
         model.forceAlert(event)
         XCTAssertEqual(model.activeAlert?.id, "fx1")
+    }
+
+    func testTodayListExcludesPastAndKeepsOngoing() {
+        let now = Date()
+        let past = MeetingEvent(
+            id: "past",
+            title: "Утро",
+            startDate: now.addingTimeInterval(-7200),
+            endDate: now.addingTimeInterval(-3600),
+            calendarId: "c",
+            calendarTitle: "Work"
+        )
+        let ongoing = MeetingEvent(
+            id: "now",
+            title: "Сейчас",
+            startDate: now.addingTimeInterval(-600),
+            endDate: now.addingTimeInterval(1800),
+            calendarId: "c",
+            calendarTitle: "Work"
+        )
+        let later = MeetingEvent(
+            id: "later",
+            title: "Вечер",
+            startDate: now.addingTimeInterval(3600),
+            endDate: now.addingTimeInterval(5400),
+            calendarId: "c",
+            calendarTitle: "Work"
+        )
+        let model = AppModel(calendar: MockCalendarService(events: [past, ongoing, later]))
+        model.start()
+        XCTAssertEqual(model.todaysRemainingEvents.map(\.id), ["now", "later"])
     }
 
     func testJoinChatZoneUsesDeepLink() {

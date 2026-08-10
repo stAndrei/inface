@@ -17,7 +17,7 @@ public final class AppModel: ObservableObject {
     public let linkDetector: MeetingLinkDetector
     public let linkOpener: LinkOpening
 
-    private let horizon: TimeInterval = 48 * 60 * 60
+    private let schedulerHorizon: TimeInterval = 48 * 60 * 60
     private var wakeObserver: NSObjectProtocol?
 
     public init(
@@ -39,6 +39,22 @@ public final class AppModel: ObservableObject {
                 self?.activeAlert = event
             }
         }
+    }
+
+    /// Remaining meetings for today (ongoing + until end of day), sorted by start.
+    public var todaysRemainingEvents: [MeetingEvent] {
+        let cal = Calendar.current
+        let now = Date()
+        let dayStart = cal.startOfDay(for: now)
+        guard let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else {
+            return events
+        }
+        return events
+            .filter { event in
+                // overlaps today and has not ended yet
+                event.startDate < dayEnd && event.endDate > now
+            }
+            .sorted { $0.startDate < $1.startDate }
     }
 
     public func start() {
@@ -75,11 +91,15 @@ public final class AppModel: ObservableObject {
             events = []
             return
         }
-        let start = Date()
-        let end = start.addingTimeInterval(horizon)
+        let cal = Calendar.current
+        let now = Date()
+        let dayStart = cal.startOfDay(for: now)
+        let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) ?? now.addingTimeInterval(24 * 3600)
+        let fetchEnd = max(dayEnd, now.addingTimeInterval(schedulerHorizon))
         do {
-            events = try calendar.fetchEvents(from: start, to: end)
-            scheduler.updateEvents(events)
+            // From start of day so ongoing morning meetings are included.
+            events = try calendar.fetchEvents(from: dayStart, to: fetchEnd)
+            scheduler.updateEvents(events.filter { $0.endDate > now })
             lastError = nil
         } catch {
             lastError = error.localizedDescription

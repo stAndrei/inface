@@ -35,7 +35,7 @@ UI language: **Russian**.
 
 ## Install (DMG)
 
-1. Download the latest `Inface-*.dmg` from [Releases](../../releases) (or build one locally — see below).
+1. Download the latest `Inface-*.dmg` from [Releases](https://github.com/stAndrei/inface/releases) (or build one locally — see below).
 2. Open the DMG and drag **Inface** into **Applications**.
 3. Launch Inface.
 4. If Gatekeeper blocks it (ad‑hoc signature): right‑click → **Open**, or allow it in **System Settings → Privacy & Security**.

@@ -78,23 +78,20 @@ public struct MeetingLinkDetector: Sendable {
         return hostMarkers.contains { host == $0 || host.hasSuffix(".\($0)") }
     }
 
-    /// ChatZone desktop handles `mattermost://` / `chatzone://`. HTTPS always opens in the browser.
+    /// ChatZone desktop handles `mattermost://` / `chatzone://`. HTTPS always opens in the browser
+    /// unless opened explicitly with ChatZone.app.
     public func launchURL(for url: URL) -> URL {
-        guard isChatZoneRelated(url) else { return url }
-
-        let scheme = url.scheme?.lowercased()
-        if scheme == "mattermost" || scheme == "chatzone" {
-            return isChatZoneMeetURL(url) ? ensuringShowMeetInApp(url) : url
-        }
+        let source = httpsURL(from: url)
+        guard isChatZoneRelated(source) else { return url }
 
         var components = URLComponents()
         components.scheme = "mattermost"
-        components.host = url.host
-        components.path = url.path.isEmpty ? "/" : url.path
-        components.fragment = url.fragment
+        components.host = source.host
+        components.path = source.path.isEmpty ? "/" : source.path
+        components.fragment = source.fragment
 
-        var items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        if isChatZoneMeetURL(url) {
+        var items = URLComponents(url: source, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        if isChatZoneMeetURL(source) {
             items.removeAll { $0.name == "showMeetInApp" || $0.name == "openMeetInApp" }
             items.append(URLQueryItem(name: "showMeetInApp", value: "true"))
         }
@@ -103,14 +100,28 @@ public struct MeetingLinkDetector: Sendable {
         return components.url ?? url
     }
 
+    /// Normalize mattermost/chatzone deep links back to https for safe browser fallback.
+    public func httpsURL(from url: URL) -> URL {
+        let scheme = url.scheme?.lowercased()
+        guard scheme == "mattermost" || scheme == "chatzone" else { return url }
+
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false) ?? URLComponents()
+        components.scheme = "https"
+        return components.url ?? url
+    }
+
     public func isChatZoneRelated(_ url: URL) -> Bool {
         let scheme = url.scheme?.lowercased()
-        if scheme == "chatzone" { return true }
+        if scheme == "chatzone" || scheme == "mattermost" {
+            guard let host = url.host?.lowercased() else { return true }
+            return isChatZoneHost(host) || host == "msg.o3.ru" || host == "msg-beta.o3.ru"
+        }
         guard let host = url.host?.lowercased() else { return false }
         return isChatZoneHost(host) || host == "msg.o3.ru" || host == "msg-beta.o3.ru"
     }
 
     public func isChatZoneMeetURL(_ url: URL) -> Bool {
+        let url = httpsURL(from: url)
         guard let host = url.host?.lowercased() else { return false }
         let path = url.path.lowercased()
         let isMeetPath = path.hasPrefix("/meet/") || path == "/meet"
@@ -125,15 +136,6 @@ public struct MeetingLinkDetector: Sendable {
         if host == "chatzone.o3t.ru" || host.hasSuffix(".chatzone.o3t.ru") { return true }
         if host == "chatzone.o3.ru" || host.hasSuffix(".chatzone.o3.ru") { return true }
         return host.contains("chatzone") && (host.hasSuffix(".o3t.ru") || host.hasSuffix(".o3.ru"))
-    }
-
-    private func ensuringShowMeetInApp(_ url: URL) -> URL {
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false) ?? URLComponents()
-        var items = components.queryItems ?? []
-        items.removeAll { $0.name == "showMeetInApp" || $0.name == "openMeetInApp" }
-        items.append(URLQueryItem(name: "showMeetInApp", value: "true"))
-        components.queryItems = items
-        return components.url ?? url
     }
 }
 

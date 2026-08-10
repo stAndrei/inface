@@ -1,5 +1,4 @@
 import Foundation
-import InfaceCore
 import SwiftUI
 
 enum Linkifier {
@@ -18,7 +17,6 @@ enum Linkifier {
         let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
         let matches = detector.matches(in: text, options: [], range: nsRange)
 
-        let meetingLinks = MeetingLinkDetector.shared
         for match in matches {
             guard let url = match.url,
                   let stringRange = Range(match.range, in: text),
@@ -27,8 +25,9 @@ enum Linkifier {
             else { continue }
 
             let range = start..<end
-            // ChatZone https links open in the browser by default — use deep link target.
-            attributed[range].link = meetingLinks.launchURL(for: url)
+            // Keep https in the attribute — mattermost:// handed to the default opener
+            // (or a browser) shows a broken URL. Opening goes through AppModel.openLink.
+            attributed[range].link = url
             attributed[range].foregroundColor = linkColor
             attributed[range].underlineStyle = .single
         }

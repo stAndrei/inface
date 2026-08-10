@@ -69,4 +69,20 @@ final class MeetingLinkDetectorTests: XCTestCase {
         XCTAssertEqual(launch.path, "/chatzone/channels/town-square")
         XCTAssertNil(launch.query)
     }
+
+    func testHttpsURLFromMattermostDeepLink() {
+        let deep = URL(string: "mattermost://chatzone.o3t.ru/meet/abc?showMeetInApp=true")!
+        let https = detector.httpsURL(from: deep)
+        XCTAssertEqual(https.scheme, "https")
+        XCTAssertEqual(https.host, "chatzone.o3t.ru")
+        XCTAssertEqual(https.path, "/meet/abc")
+    }
+
+    func testLaunchURLFromMattermostIsStable() {
+        let deep = URL(string: "mattermost://chatzone.o3t.ru/meet/abc?showMeetInApp=true")!
+        let launch = detector.launchURL(for: deep)
+        XCTAssertEqual(launch.scheme, "mattermost")
+        XCTAssertEqual(launch.path, "/meet/abc")
+        XCTAssertTrue(launch.query?.contains("showMeetInApp=true") == true)
+    }
 }

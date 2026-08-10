@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var loginItem: LoginItemController
 
     var body: some View {
         Form {
@@ -21,12 +22,34 @@ struct SettingsView: View {
                     set: { model.settings.alertsPaused = $0 }
                 ))
             }
+
+            Section("Запуск") {
+                Toggle("Запускать при входе в систему", isOn: Binding(
+                    get: { loginItem.wantsLaunchAtLogin },
+                    set: { loginItem.setEnabled($0) }
+                ))
+                if loginItem.needsApproval {
+                    Text("Разрешите Inface в «Системные настройки → Основные → Объекты входа».")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Button("Открыть объекты входа") {
+                        loginItem.openLoginItemsSettings()
+                    }
+                }
+                if let error = loginItem.lastError {
+                    Text(error)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                }
+            }
+
             Section("О приложении") {
                 Text("Inface — напоминания о встречах, которые нельзя пропустить.")
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 240)
+        .frame(width: 420, height: 320)
+        .onAppear { loginItem.refresh() }
     }
 }

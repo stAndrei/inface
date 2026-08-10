@@ -24,7 +24,10 @@ let package = Package(
             name: "InfaceApp",
             dependencies: ["InfaceCore"],
             path: "Sources/InfaceApp",
-            exclude: ["Info.plist"]
+            exclude: ["Info.plist"],
+            linkerSettings: [
+                .linkedFramework("ServiceManagement")
+            ]
         ),
         .executableTarget(
             name: "InfaceTestRunner",

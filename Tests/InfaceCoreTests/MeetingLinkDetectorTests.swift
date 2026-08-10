@@ -60,4 +60,13 @@ final class MeetingLinkDetectorTests: XCTestCase {
         XCTAssertEqual(launch.path, "/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169")
         XCTAssertTrue(launch.query?.contains("showMeetInApp=true") == true)
     }
+
+    func testChatZoneChannelLinkRewritesToMattermost() {
+        let https = URL(string: "https://chatzone.o3t.ru/chatzone/channels/town-square")!
+        let launch = detector.launchURL(for: https)
+        XCTAssertEqual(launch.scheme, "mattermost")
+        XCTAssertEqual(launch.host, "chatzone.o3t.ru")
+        XCTAssertEqual(launch.path, "/chatzone/channels/town-square")
+        XCTAssertNil(launch.query)
+    }
 }

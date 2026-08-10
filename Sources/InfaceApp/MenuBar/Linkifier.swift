@@ -17,6 +17,7 @@ enum Linkifier {
         let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
         let matches = detector.matches(in: text, options: [], range: nsRange)
 
+        let meetingLinks = MeetingLinkDetector.shared
         for match in matches {
             guard let url = match.url,
                   let stringRange = Range(match.range, in: text),
@@ -25,7 +26,8 @@ enum Linkifier {
             else { continue }
 
             let range = start..<end
-            attributed[range].link = url
+            // ChatZone https links open in the browser by default — use deep link target.
+            attributed[range].link = meetingLinks.launchURL(for: url)
             attributed[range].foregroundColor = linkColor
             attributed[range].underlineStyle = .single
         }

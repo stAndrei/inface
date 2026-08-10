@@ -10,21 +10,21 @@ public struct WorkspaceLinkOpener: LinkOpening {
         let detector = MeetingLinkDetector.shared
         let launchURL = detector.launchURL(for: url)
 
+        // Prefer ChatZone.app explicitly — https://chatzone… defaults to the browser.
+        if detector.isChatZoneRelated(url) || detector.isChatZoneRelated(launchURL),
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.chatzoneBundleID) {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            NSWorkspace.shared.open([launchURL], withApplicationAt: appURL, configuration: configuration, completionHandler: nil)
+            return true
+        }
+
         if NSWorkspace.shared.open(launchURL) {
             return true
         }
 
-        // Fallback: ask ChatZone.app to open the original/https URL.
-        if detector.isChatZoneMeetURL(url) || detector.isChatZoneHost(url.host?.lowercased() ?? ""),
-           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.chatzoneBundleID) {
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = true
-            NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: configuration, completionHandler: nil)
-            return true
-        }
-
-        // Last resort: try chatzone:// scheme variant
-        if detector.isChatZoneMeetURL(url),
+        // Last resort: try chatzone:// scheme variant for meet links.
+        if detector.isChatZoneMeetURL(url) || detector.isChatZoneMeetURL(launchURL),
            var components = URLComponents(url: launchURL, resolvingAgainstBaseURL: false) {
             components.scheme = "chatzone"
             if let alt = components.url, NSWorkspace.shared.open(alt) {

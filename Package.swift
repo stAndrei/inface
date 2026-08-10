@@ -30,6 +30,16 @@ let package = Package(
             name: "InfaceTestRunner",
             dependencies: ["InfaceCore"],
             path: "Sources/InfaceTestRunner"
+        ),
+        .testTarget(
+            name: "InfaceCoreTests",
+            dependencies: ["InfaceCore"],
+            path: "Tests/InfaceCoreTests"
+        ),
+        .testTarget(
+            name: "InfaceFunctionalTests",
+            dependencies: ["InfaceCore"],
+            path: "Tests/InfaceFunctionalTests"
         )
     ]
 )

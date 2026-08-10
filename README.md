@@ -10,14 +10,30 @@ Menu-bar напоминания о встречах для macOS (русский
 
 ## Сборка и запуск
 
+Один раз переключи CLI на полный Xcode (нужен пароль):
+
 ```bash
-cd /Users/petrovan/work/inface
-swift build
-swift build --product InfaceTests && .build/debug/InfaceTests
-swift run Inface
+./Scripts/use-xcode.sh
+# или:
+# sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```
 
-> На машине без полного Xcode нет XCTest — используется `InfaceTests` (unit + functional harness). После установки Xcode можно добавить XCTest/XCUITest targets.
+Пока `xcode-select` не переключён, в каждой сессии можно так:
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+```
+
+```bash
+cd /Users/petrovan/work/inface
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+swift test
+swift build --product InfaceTests && .build/debug/InfaceTests
+./Scripts/package-app.sh
+open dist/Inface.app
+```
+
+В menu bar появится иконка календаря. Нажми «Запросить доступ к Календарю» — должны подтянуться события Exchange из Calendar.app.
 
 Для `.app` бандла после установки Xcode:
 

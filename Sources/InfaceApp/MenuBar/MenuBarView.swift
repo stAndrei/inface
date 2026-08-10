@@ -22,7 +22,10 @@ struct MenuBarView: View {
                                 self.selectedEvent = nil
                             }
                         },
-                        onJoin: { _ = model.joinMeeting(for: selectedEvent) }
+                        onJoin: {
+                            _ = model.joinMeeting(for: selectedEvent)
+                            MenuBarPopoverDismisser.dismiss()
+                        }
                     )
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),

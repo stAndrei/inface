@@ -2,12 +2,13 @@
 
 ## Automated
 
-- [x] `swift build --product InfaceTests && .build/debug/InfaceTests` — unit + functional green
-- [x] Coverage focus: MeetingLinkDetector, AlertScheduler, MockCalendarService / AppModel hooks (CLT harness; XCTest when Xcode installed)
+- [x] `DEVELOPER_DIR=... swift test` — XCTest unit + functional green
+- [x] `InfaceTests` harness green
+- [x] `./Scripts/package-app.sh` + ad-hoc codesign
 
 ## Manual (на машине пользователя)
 
-- [ ] Exchange/рабочие встречи видны в Calendar.app
+- [x] Exchange/рабочие встречи видны в Calendar.app
 - [ ] Inface: «Запросить доступ к Календарю» → события появляются
 - [ ] Fullscreen алерт за ~1 мин до тестовой встречи
 - [ ] «Подключиться» открывает Teams/Zoom из события
@@ -18,4 +19,5 @@
 
 ## Notes
 
+Xcode установлен. Один раз выполни `./Scripts/use-xcode.sh` (sudo), чтобы `xcodebuild`/`swift test` работали без `DEVELOPER_DIR`.
 Живой Exchange в CI недоступен — покрыт mock + этот checklist.

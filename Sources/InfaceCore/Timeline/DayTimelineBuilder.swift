@@ -2,7 +2,6 @@ import Foundation
 
 public struct DayTimelineInterval: Equatable, Sendable, Identifiable {
     public enum Kind: Equatable, Sendable {
-        case free
         case meeting(MeetingEvent)
     }
 
@@ -25,6 +24,7 @@ public struct DayTimelineModel: Equatable, Sendable {
     public let dayStart: Date
     public let dayEnd: Date
     public let visibleStart: Date
+    public let visibleEnd: Date
     public let intervals: [DayTimelineInterval]
     public let meetings: [MeetingEvent]
     public let isToday: Bool
@@ -33,6 +33,7 @@ public struct DayTimelineModel: Equatable, Sendable {
         dayStart: Date,
         dayEnd: Date,
         visibleStart: Date,
+        visibleEnd: Date,
         intervals: [DayTimelineInterval],
         meetings: [MeetingEvent],
         isToday: Bool
@@ -40,18 +41,19 @@ public struct DayTimelineModel: Equatable, Sendable {
         self.dayStart = dayStart
         self.dayEnd = dayEnd
         self.visibleStart = visibleStart
+        self.visibleEnd = visibleEnd
         self.intervals = intervals
         self.meetings = meetings
         self.isToday = isToday
     }
 
     public var visibleDuration: TimeInterval {
-        max(dayEnd.timeIntervalSince(visibleStart), 60)
+        max(visibleEnd.timeIntervalSince(visibleStart), 60)
     }
 }
 
 public enum DayTimelineBuilder {
-    /// Builds a day timeline for `day`, with free gaps between meetings.
+    /// Timeline spans only from the first to the last meeting of the day.
     public static func build(
         events: [MeetingEvent],
         day: Date,
@@ -80,49 +82,27 @@ public enum DayTimelineBuilder {
             .filter { $0.endDate > $0.startDate }
             .sorted { $0.startDate < $1.startDate }
 
-        let workdayStart = calendar.date(bySettingHour: 8, minute: 0, second: 0, of: dayStart) ?? dayStart
-        let firstMeetingStart = meetings.map(\.startDate).min()
-        var visibleStart = workdayStart
-        if let firstMeetingStart {
-            visibleStart = min(workdayStart, firstMeetingStart)
-        }
-        visibleStart = max(visibleStart, dayStart)
-
-        var cursor = visibleStart
-        var intervals: [DayTimelineInterval] = []
-
-        for meeting in meetings {
-            let meetingStart = max(meeting.startDate, visibleStart)
-            let meetingEnd = max(meeting.endDate, meetingStart)
-            if meetingStart > cursor {
-                intervals.append(
-                    DayTimelineInterval(
-                        id: "free-\(cursor.timeIntervalSince1970)-\(meeting.id)",
-                        start: cursor,
-                        end: meetingStart,
-                        kind: .free
-                    )
-                )
-            }
-            intervals.append(
-                DayTimelineInterval(
-                    id: "meeting-\(meeting.id)",
-                    start: meetingStart,
-                    end: meetingEnd,
-                    kind: .meeting(meeting)
-                )
+        guard let first = meetings.first, let last = meetings.last else {
+            return DayTimelineModel(
+                dayStart: dayStart,
+                dayEnd: dayEnd,
+                visibleStart: dayStart,
+                visibleEnd: dayStart.addingTimeInterval(60),
+                intervals: [],
+                meetings: [],
+                isToday: isToday
             )
-            cursor = max(cursor, meetingEnd)
         }
 
-        if cursor < dayEnd {
-            intervals.append(
-                DayTimelineInterval(
-                    id: "free-end-\(cursor.timeIntervalSince1970)",
-                    start: cursor,
-                    end: dayEnd,
-                    kind: .free
-                )
+        let visibleStart = first.startDate
+        let visibleEnd = max(last.endDate, visibleStart.addingTimeInterval(60))
+
+        let intervals = meetings.map { meeting in
+            DayTimelineInterval(
+                id: "meeting-\(meeting.id)",
+                start: meeting.startDate,
+                end: meeting.endDate,
+                kind: .meeting(meeting)
             )
         }
 
@@ -130,12 +110,14 @@ public enum DayTimelineBuilder {
             dayStart: dayStart,
             dayEnd: dayEnd,
             visibleStart: visibleStart,
+            visibleEnd: visibleEnd,
             intervals: intervals,
             meetings: meetings,
             isToday: isToday
         )
     }
 
+    /// Hour marks strictly inside `(start, end]` plus the hour of `start` when it falls on an hour.
     public static func hours(from start: Date, to end: Date, calendar: Calendar = .current) -> [Date] {
         var result: [Date] = []
         let components = calendar.dateComponents([.year, .month, .day, .hour], from: start)
@@ -143,7 +125,7 @@ public enum DayTimelineBuilder {
         if cursor < start {
             cursor = calendar.date(byAdding: .hour, value: 1, to: cursor) ?? cursor
         }
-        while cursor < end {
+        while cursor <= end {
             result.append(cursor)
             guard let next = calendar.date(byAdding: .hour, value: 1, to: cursor) else { break }
             cursor = next

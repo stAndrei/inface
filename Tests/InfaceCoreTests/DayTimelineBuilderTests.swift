@@ -2,7 +2,7 @@ import XCTest
 @testable import InfaceCore
 
 final class DayTimelineBuilderTests: XCTestCase {
-    func testInsertsFreeGapsBetweenMeetings() {
+    func testSpanIsFirstToLastMeetingWithoutTrailingFreeTime() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let day = calendar.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: 0))!
@@ -27,35 +27,23 @@ final class DayTimelineBuilderTests: XCTestCase {
 
         let timeline = DayTimelineBuilder.build(events: [a, b], day: day, now: now, calendar: calendar)
         XCTAssertEqual(timeline.meetings.map(\.id), ["a", "b"])
-
-        let kinds = timeline.intervals.map { interval -> String in
-            switch interval.kind {
-            case .free: return "free"
-            case .meeting(let e): return "m:\(e.id)"
-            }
-        }
-        // Visible starts at 08:00 workday → free 8-10, A, free 11-13, B, free to midnight
-        XCTAssertEqual(kinds, ["free", "m:a", "free", "m:b", "free"])
-        XCTAssertEqual(timeline.intervals[0].duration, 2 * 60 * 60, accuracy: 0.1)
-        XCTAssertEqual(timeline.intervals[2].duration, 2 * 60 * 60, accuracy: 0.1)
+        XCTAssertEqual(timeline.visibleStart, a.startDate)
+        XCTAssertEqual(timeline.visibleEnd, b.endDate)
+        XCTAssertEqual(timeline.intervals.count, 2)
+        XCTAssertFalse(timeline.intervals.contains { interval in
+            if case .meeting = interval.kind { return false }
+            return true
+        })
     }
 
-    func testOtherDayIncludesFullSchedule() {
+    func testEmptyDayHasNoMeetings() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let day = calendar.date(from: DateComponents(year: 2026, month: 8, day: 11, hour: 0))!
         let now = calendar.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: 12))!
-        let meeting = MeetingEvent(
-            id: "m",
-            title: "Tomorrow",
-            startDate: calendar.date(byAdding: .hour, value: 9, to: day)!,
-            endDate: calendar.date(byAdding: .hour, value: 10, to: day)!,
-            calendarId: "c",
-            calendarTitle: "Work"
-        )
-        let timeline = DayTimelineBuilder.build(events: [meeting], day: day, now: now, calendar: calendar)
-        XCTAssertFalse(timeline.isToday)
-        XCTAssertEqual(timeline.meetings.map(\.id), ["m"])
+        let timeline = DayTimelineBuilder.build(events: [], day: day, now: now, calendar: calendar)
+        XCTAssertTrue(timeline.meetings.isEmpty)
+        XCTAssertTrue(timeline.intervals.isEmpty)
     }
 }
 

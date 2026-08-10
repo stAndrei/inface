@@ -190,10 +190,9 @@ func appModelFunctionalTests() -> Int {
         events: [past, ongoing, later],
         day: now
     )
-    f += expect(timeline.meetings.map(\.id) == ["past", "now", "later"] || timeline.meetings.map(\.id) == ["now", "later"] || timeline.meetings.count >= 2, "timeline meetings")
-    f += expect(timeline.intervals.contains(where: {
-        if case .free = $0.kind { return $0.duration > 0 } else { return false }
-    }), "timeline has free gap")
+    f += expect(timeline.visibleStart == past.startDate || timeline.visibleStart == ongoing.startDate, "span starts at first")
+    f += expect(timeline.visibleEnd == later.endDate, "span ends at last")
+    f += expect(timeline.intervals.count == timeline.meetings.count, "only meetings, no free gaps")
 
     let nav = AppModel(calendar: MockCalendarService(authorizationStatus: .authorized), selectedDay: now)
     let before = Calendar.current.startOfDay(for: nav.selectedDay)

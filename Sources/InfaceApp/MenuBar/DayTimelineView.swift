@@ -6,55 +6,47 @@ struct DayTimelineView: View {
     let now: Date
     let onSelect: (MeetingEvent) -> Void
 
-    private let hourHeight: CGFloat = 96
     private let gutterWidth: CGFloat = 64
     private let detector = MeetingLinkDetector.shared
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                ZStack(alignment: .topLeading) {
-                    hourGrid
-                    contentColumn
-                    if timeline.isToday {
-                        nowLine
-                            .id("now-line")
+        Group {
+            if timeline.meetings.isEmpty {
+                Text("Нет встреч в этот день")
+                    .font(.title3)
+                    .foregroundStyle(InfaceTheme.textSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, 18)
+            } else {
+                GeometryReader { geo in
+                    let hourHeight = computedHourHeight(availableHeight: geo.size.height)
+                    ZStack(alignment: .topLeading) {
+                        hourGrid(hourHeight: hourHeight)
+                        meetingsLayer(hourHeight: hourHeight)
+                        if timeline.isToday {
+                            nowLine(hourHeight: hourHeight)
+                        }
                     }
-                }
-                .frame(height: totalHeight + 16)
-                .padding(.trailing, 12)
-                .padding(.leading, 8)
-                .padding(.bottom, 12)
-                .id(timeline.dayStart.timeIntervalSince1970)
-            }
-            .onAppear { scrollToRelevant(proxy) }
-            .onChange(of: timeline.dayStart) { _, _ in
-                scrollToRelevant(proxy)
-            }
-        }
-    }
-
-    private func scrollToRelevant(_ proxy: ScrollViewProxy) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            withAnimation(.easeOut(duration: 0.25)) {
-                if timeline.isToday {
-                    proxy.scrollTo("now-line", anchor: .center)
-                } else if let first = timeline.meetings.first {
-                    proxy.scrollTo("meeting-\(first.id)", anchor: .top)
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+                    .padding(.trailing, 10)
+                    .padding(.leading, 6)
                 }
             }
         }
+        .id(timeline.visibleStart.timeIntervalSince1970 + timeline.visibleEnd.timeIntervalSince1970)
     }
 
-    private var totalHeight: CGFloat {
-        CGFloat(timeline.visibleDuration / 60.0) * (hourHeight / 60.0)
+    private func computedHourHeight(availableHeight: CGFloat) -> CGFloat {
+        let hours = max(timeline.visibleDuration / 3600.0, 0.25)
+        // Fill the available height exactly — no scroll.
+        return max(availableHeight / CGFloat(hours), 28)
     }
 
-    private var hourGrid: some View {
-        let hours = DayTimelineBuilder.hours(from: timeline.visibleStart, to: timeline.dayEnd)
+    private func hourGrid(hourHeight: CGFloat) -> some View {
+        let hours = DayTimelineBuilder.hours(from: timeline.visibleStart, to: timeline.visibleEnd)
         return ZStack(alignment: .topLeading) {
             ForEach(Array(hours.enumerated()), id: \.offset) { _, hour in
-                let y = yOffset(for: hour)
+                let y = yOffset(for: hour, hourHeight: hourHeight)
                 HStack(alignment: .center, spacing: 10) {
                     Text(hourLabel(hour))
                         .font(.callout.monospacedDigit().weight(.medium))
@@ -69,42 +61,20 @@ struct DayTimelineView: View {
         }
     }
 
-    private var contentColumn: some View {
+    private func meetingsLayer(hourHeight: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
-            ForEach(timeline.intervals) { interval in
-                switch interval.kind {
-                case .free:
-                    freeGap(interval)
-                case .meeting(let event):
-                    meetingBlock(event, start: interval.start, end: interval.end)
-                        .id("meeting-\(event.id)")
-                }
+            ForEach(timeline.meetings) { event in
+                meetingBlock(event, hourHeight: hourHeight)
             }
         }
         .padding(.leading, gutterWidth)
     }
 
-    @ViewBuilder
-    private func freeGap(_ gap: DayTimelineInterval) -> some View {
-        let y = yOffset(for: gap.start)
-        let h = max(height(for: gap.duration), 1)
-        Group {
-            if gap.duration >= 12 * 60 {
-                Text(freeLabel(for: gap))
-                    .font(.callout)
-                    .foregroundStyle(InfaceTheme.textSecondary.opacity(0.75))
-                    .padding(.leading, 12)
-                    .frame(maxWidth: .infinity, minHeight: h, maxHeight: h, alignment: .leading)
-            } else {
-                Color.clear.frame(height: h)
-            }
-        }
-        .offset(y: y)
-    }
-
-    private func meetingBlock(_ event: MeetingEvent, start: Date, end: Date) -> some View {
-        let y = yOffset(for: start)
-        let h = max(height(for: end.timeIntervalSince(start)), 36)
+    private func meetingBlock(_ event: MeetingEvent, hourHeight: CGFloat) -> some View {
+        let start = max(event.startDate, timeline.visibleStart)
+        let end = min(event.endDate, timeline.visibleEnd)
+        let y = yOffset(for: start, hourHeight: hourHeight)
+        let h = max(height(for: end.timeIntervalSince(start), hourHeight: hourHeight), 28)
         let isPast = timeline.isToday && event.endDate <= now
 
         return Button {
@@ -119,7 +89,7 @@ struct DayTimelineView: View {
                         Text(event.title)
                             .font(.body.weight(.semibold))
                             .foregroundStyle(InfaceTheme.textPrimary.opacity(isPast ? 0.65 : 1))
-                            .lineLimit(h < 56 ? 1 : 2)
+                            .lineLimit(h < 48 ? 1 : 2)
                             .multilineTextAlignment(.leading)
                         Spacer(minLength: 6)
                         if event.isOngoing {
@@ -131,7 +101,7 @@ struct DayTimelineView: View {
                     Text(timeRange(event))
                         .font(.callout.monospacedDigit())
                         .foregroundStyle(InfaceTheme.textSecondary)
-                    if h >= 64 {
+                    if h >= 58 {
                         HStack(spacing: 8) {
                             if !event.calendarTitle.isEmpty {
                                 Text(event.calendarTitle)
@@ -147,7 +117,7 @@ struct DayTimelineView: View {
                         .foregroundStyle(InfaceTheme.textSecondary.opacity(0.95))
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 6)
                 .padding(.trailing, 10)
             }
             .frame(maxWidth: .infinity, minHeight: h, maxHeight: h, alignment: .topLeading)
@@ -164,9 +134,9 @@ struct DayTimelineView: View {
     }
 
     @ViewBuilder
-    private var nowLine: some View {
-        if now >= timeline.visibleStart && now <= timeline.dayEnd {
-            let y = yOffset(for: now)
+    private func nowLine(hourHeight: CGFloat) -> some View {
+        if now >= timeline.visibleStart && now <= timeline.visibleEnd {
+            let y = yOffset(for: now, hourHeight: hourHeight)
             HStack(spacing: 0) {
                 Circle()
                     .fill(InfaceTheme.danger)
@@ -181,12 +151,12 @@ struct DayTimelineView: View {
         }
     }
 
-    private func yOffset(for date: Date) -> CGFloat {
+    private func yOffset(for date: Date, hourHeight: CGFloat) -> CGFloat {
         let minutes = date.timeIntervalSince(timeline.visibleStart) / 60.0
         return CGFloat(max(minutes, 0)) * (hourHeight / 60.0)
     }
 
-    private func height(for duration: TimeInterval) -> CGFloat {
+    private func height(for duration: TimeInterval, hourHeight: CGFloat) -> CGFloat {
         CGFloat(max(duration, 60) / 60.0) * (hourHeight / 60.0)
     }
 
@@ -202,16 +172,5 @@ struct DayTimelineView: View {
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "HH:mm"
         return "\(formatter.string(from: event.startDate))–\(formatter.string(from: event.endDate))"
-    }
-
-    private func freeLabel(for gap: DayTimelineInterval) -> String {
-        let minutes = Int(gap.duration / 60)
-        if minutes >= 60 {
-            let hours = minutes / 60
-            let rem = minutes % 60
-            if rem == 0 { return "Свободно · \(hours) ч" }
-            return "Свободно · \(hours) ч \(rem) мин"
-        }
-        return "Свободно · \(minutes) мин"
     }
 }

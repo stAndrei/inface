@@ -36,6 +36,7 @@ final class AlertPresenter: ObservableObject {
                 meetingURL: model.linkDetector.detect(in: event),
                 onJoin: { [weak self] in
                     _ = self?.model.joinMeeting(for: event)
+                    self?.model.dismissAlert()
                 },
                 onDismiss: { [weak self] in
                     self?.model.dismissAlert()

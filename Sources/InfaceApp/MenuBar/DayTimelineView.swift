@@ -7,11 +7,12 @@ struct DayTimelineView: View {
     let onSelect: (MeetingEvent) -> Void
 
     private let gutterWidth: CGFloat = 64
+    private let columnSpacing: CGFloat = 4
     private let detector = MeetingLinkDetector.shared
 
     var body: some View {
         Group {
-            if timeline.meetings.isEmpty {
+            if timeline.laidOutMeetings.isEmpty {
                 Text("Нет встреч в этот день")
                     .font(.title3)
                     .foregroundStyle(InfaceTheme.textSecondary)
@@ -20,9 +21,10 @@ struct DayTimelineView: View {
             } else {
                 GeometryReader { geo in
                     let hourHeight = computedHourHeight(availableHeight: geo.size.height)
+                    let contentWidth = max(geo.size.width - gutterWidth - 16, 80)
                     ZStack(alignment: .topLeading) {
                         hourGrid(hourHeight: hourHeight)
-                        meetingsLayer(hourHeight: hourHeight)
+                        meetingsLayer(hourHeight: hourHeight, contentWidth: contentWidth)
                         if timeline.isToday {
                             nowLine(hourHeight: hourHeight)
                         }
@@ -38,7 +40,6 @@ struct DayTimelineView: View {
 
     private func computedHourHeight(availableHeight: CGFloat) -> CGFloat {
         let hours = max(timeline.visibleDuration / 3600.0, 0.25)
-        // Fill the available height exactly — no scroll.
         return max(availableHeight / CGFloat(hours), 28)
     }
 
@@ -61,37 +62,47 @@ struct DayTimelineView: View {
         }
     }
 
-    private func meetingsLayer(hourHeight: CGFloat) -> some View {
+    private func meetingsLayer(hourHeight: CGFloat, contentWidth: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
-            ForEach(timeline.meetings) { event in
-                meetingBlock(event, hourHeight: hourHeight)
+            ForEach(timeline.laidOutMeetings) { item in
+                meetingBlock(item, hourHeight: hourHeight, contentWidth: contentWidth)
             }
         }
         .padding(.leading, gutterWidth)
     }
 
-    private func meetingBlock(_ event: MeetingEvent, hourHeight: CGFloat) -> some View {
+    private func meetingBlock(
+        _ item: LaidOutMeeting,
+        hourHeight: CGFloat,
+        contentWidth: CGFloat
+    ) -> some View {
+        let event = item.event
         let start = max(event.startDate, timeline.visibleStart)
         let end = min(event.endDate, timeline.visibleEnd)
         let y = yOffset(for: start, hourHeight: hourHeight)
         let h = max(height(for: end.timeIntervalSince(start), hourHeight: hourHeight), 28)
         let isPast = timeline.isToday && event.endDate <= now
 
+        let columns = CGFloat(item.columnCount)
+        let totalSpacing = columnSpacing * max(columns - 1, 0)
+        let columnWidth = max((contentWidth - totalSpacing) / columns, 40)
+        let x = CGFloat(item.columnIndex) * (columnWidth + columnSpacing)
+
         return Button {
             onSelect(event)
         } label: {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(InfaceTheme.accent.opacity(isPast ? 0.45 : 1))
-                    .frame(width: 5)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    .frame(width: 4)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(event.title)
                             .font(.body.weight(.semibold))
                             .foregroundStyle(InfaceTheme.textPrimary.opacity(isPast ? 0.65 : 1))
                             .lineLimit(h < 48 ? 1 : 2)
                             .multilineTextAlignment(.leading)
-                        Spacer(minLength: 6)
+                        Spacer(minLength: 4)
                         if event.isOngoing {
                             Text("сейчас")
                                 .font(.caption.weight(.bold))
@@ -101,7 +112,7 @@ struct DayTimelineView: View {
                     Text(timeRange(event))
                         .font(.callout.monospacedDigit())
                         .foregroundStyle(InfaceTheme.textSecondary)
-                    if h >= 58 {
+                    if h >= 58, item.columnCount == 1 {
                         HStack(spacing: 8) {
                             if !event.calendarTitle.isEmpty {
                                 Text(event.calendarTitle)
@@ -118,9 +129,9 @@ struct DayTimelineView: View {
                     }
                 }
                 .padding(.vertical, 6)
-                .padding(.trailing, 10)
+                .padding(.trailing, 8)
             }
-            .frame(maxWidth: .infinity, minHeight: h, maxHeight: h, alignment: .topLeading)
+            .frame(width: columnWidth, height: h, alignment: .topLeading)
             .background(InfaceTheme.accent.opacity(event.isOngoing ? 0.24 : (isPast ? 0.08 : 0.16)))
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -129,7 +140,7 @@ struct DayTimelineView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
-        .offset(y: y)
+        .offset(x: x, y: y)
         .accessibilityHint("Показать подробности")
     }
 

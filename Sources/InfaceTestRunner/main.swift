@@ -192,7 +192,20 @@ func appModelFunctionalTests() -> Int {
     )
     f += expect(timeline.visibleStart == past.startDate || timeline.visibleStart == ongoing.startDate, "span starts at first")
     f += expect(timeline.visibleEnd == later.endDate, "span ends at last")
-    f += expect(timeline.intervals.count == timeline.meetings.count, "only meetings, no free gaps")
+    f += expect(timeline.laidOutMeetings.count == timeline.meetings.count, "laid out meetings")
+
+    let overlapA = MeetingEvent(
+        id: "oa", title: "A", startDate: now.addingTimeInterval(3600),
+        endDate: now.addingTimeInterval(7200), calendarId: "c", calendarTitle: "Work"
+    )
+    let overlapB = MeetingEvent(
+        id: "ob", title: "B", startDate: now.addingTimeInterval(5400),
+        endDate: now.addingTimeInterval(9000), calendarId: "c", calendarTitle: "Work"
+    )
+    let columns = DayTimelineBuilder.layoutColumns(for: [overlapA, overlapB])
+    f += expect(columns.count == 2, "overlap count")
+    f += expect(columns.map(\.columnCount).allSatisfy { $0 == 2 }, "two columns")
+    f += expect(columns[0].columnIndex != columns[1].columnIndex, "different columns")
 
     let nav = AppModel(calendar: MockCalendarService(authorizationStatus: .authorized), selectedDay: now)
     let before = Calendar.current.startOfDay(for: nav.selectedDay)

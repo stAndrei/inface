@@ -1,22 +1,15 @@
 import Foundation
 
-public struct DayTimelineInterval: Equatable, Sendable, Identifiable {
-    public enum Kind: Equatable, Sendable {
-        case meeting(MeetingEvent)
-    }
+public struct LaidOutMeeting: Equatable, Sendable, Identifiable {
+    public var id: String { event.id }
+    public let event: MeetingEvent
+    public let columnIndex: Int
+    public let columnCount: Int
 
-    public let id: String
-    public let start: Date
-    public let end: Date
-    public let kind: Kind
-
-    public var duration: TimeInterval { end.timeIntervalSince(start) }
-
-    public init(id: String, start: Date, end: Date, kind: Kind) {
-        self.id = id
-        self.start = start
-        self.end = end
-        self.kind = kind
+    public init(event: MeetingEvent, columnIndex: Int, columnCount: Int) {
+        self.event = event
+        self.columnIndex = columnIndex
+        self.columnCount = max(columnCount, 1)
     }
 }
 
@@ -25,25 +18,24 @@ public struct DayTimelineModel: Equatable, Sendable {
     public let dayEnd: Date
     public let visibleStart: Date
     public let visibleEnd: Date
-    public let intervals: [DayTimelineInterval]
-    public let meetings: [MeetingEvent]
+    public let laidOutMeetings: [LaidOutMeeting]
     public let isToday: Bool
+
+    public var meetings: [MeetingEvent] { laidOutMeetings.map(\.event) }
 
     public init(
         dayStart: Date,
         dayEnd: Date,
         visibleStart: Date,
         visibleEnd: Date,
-        intervals: [DayTimelineInterval],
-        meetings: [MeetingEvent],
+        laidOutMeetings: [LaidOutMeeting],
         isToday: Bool
     ) {
         self.dayStart = dayStart
         self.dayEnd = dayEnd
         self.visibleStart = visibleStart
         self.visibleEnd = visibleEnd
-        self.intervals = intervals
-        self.meetings = meetings
+        self.laidOutMeetings = laidOutMeetings
         self.isToday = isToday
     }
 
@@ -54,6 +46,7 @@ public struct DayTimelineModel: Equatable, Sendable {
 
 public enum DayTimelineBuilder {
     /// Timeline spans only from the first to the last meeting of the day.
+    /// Overlapping meetings get Calendar-like column layout.
     public static func build(
         events: [MeetingEvent],
         day: Date,
@@ -80,44 +73,86 @@ public enum DayTimelineBuilder {
                 )
             }
             .filter { $0.endDate > $0.startDate }
-            .sorted { $0.startDate < $1.startDate }
+            .sorted {
+                if $0.startDate != $1.startDate { return $0.startDate < $1.startDate }
+                return $0.endDate > $1.endDate
+            }
 
-        guard let first = meetings.first, let last = meetings.last else {
+        guard let first = meetings.first, let lastByEnd = meetings.max(by: { $0.endDate < $1.endDate }) else {
             return DayTimelineModel(
                 dayStart: dayStart,
                 dayEnd: dayEnd,
                 visibleStart: dayStart,
                 visibleEnd: dayStart.addingTimeInterval(60),
-                intervals: [],
-                meetings: [],
+                laidOutMeetings: [],
                 isToday: isToday
             )
         }
 
         let visibleStart = first.startDate
-        let visibleEnd = max(last.endDate, visibleStart.addingTimeInterval(60))
-
-        let intervals = meetings.map { meeting in
-            DayTimelineInterval(
-                id: "meeting-\(meeting.id)",
-                start: meeting.startDate,
-                end: meeting.endDate,
-                kind: .meeting(meeting)
-            )
-        }
+        let visibleEnd = max(lastByEnd.endDate, visibleStart.addingTimeInterval(60))
+        let laidOut = layoutColumns(for: meetings)
 
         return DayTimelineModel(
             dayStart: dayStart,
             dayEnd: dayEnd,
             visibleStart: visibleStart,
             visibleEnd: visibleEnd,
-            intervals: intervals,
-            meetings: meetings,
+            laidOutMeetings: laidOut,
             isToday: isToday
         )
     }
 
-    /// Hour marks strictly inside `(start, end]` plus the hour of `start` when it falls on an hour.
+    /// Assigns side-by-side columns for overlapping meetings (Mac Calendar style).
+    public static func layoutColumns(for meetings: [MeetingEvent]) -> [LaidOutMeeting] {
+        guard !meetings.isEmpty else { return [] }
+
+        let sorted = meetings.sorted {
+            if $0.startDate != $1.startDate { return $0.startDate < $1.startDate }
+            return $0.endDate > $1.endDate
+        }
+
+        var result: [LaidOutMeeting] = []
+        var index = 0
+        while index < sorted.count {
+            var cluster: [MeetingEvent] = [sorted[index]]
+            var clusterEnd = sorted[index].endDate
+            var next = index + 1
+            while next < sorted.count, sorted[next].startDate < clusterEnd {
+                cluster.append(sorted[next])
+                clusterEnd = max(clusterEnd, sorted[next].endDate)
+                next += 1
+            }
+
+            result.append(contentsOf: packCluster(cluster))
+            index = next
+        }
+        return result
+    }
+
+    private static func packCluster(_ cluster: [MeetingEvent]) -> [LaidOutMeeting] {
+        let ordered = cluster.sorted {
+            if $0.startDate != $1.startDate { return $0.startDate < $1.startDate }
+            return $0.endDate > $1.endDate
+        }
+
+        var columnEnds: [Date] = []
+        var placements: [(MeetingEvent, Int)] = []
+
+        for event in ordered {
+            if let column = columnEnds.firstIndex(where: { $0 <= event.startDate }) {
+                columnEnds[column] = event.endDate
+                placements.append((event, column))
+            } else {
+                columnEnds.append(event.endDate)
+                placements.append((event, columnEnds.count - 1))
+            }
+        }
+
+        let columnCount = max(columnEnds.count, 1)
+        return placements.map { LaidOutMeeting(event: $0.0, columnIndex: $0.1, columnCount: columnCount) }
+    }
+
     public static func hours(from start: Date, to end: Date, calendar: Calendar = .current) -> [Date] {
         var result: [Date] = []
         let components = calendar.dateComponents([.year, .month, .day, .hour], from: start)

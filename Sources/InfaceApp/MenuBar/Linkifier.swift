@@ -1,4 +1,5 @@
 import Foundation
+import InfaceCore
 import SwiftUI
 
 enum Linkifier {

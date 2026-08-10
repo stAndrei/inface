@@ -114,7 +114,8 @@ public final class AppModel: ObservableObject {
 
     public func joinMeeting(for event: MeetingEvent) -> Bool {
         guard let url = linkDetector.detect(in: event) else { return false }
-        return linkOpener.open(url)
+        let launchURL = linkDetector.launchURL(for: url)
+        return linkOpener.open(launchURL)
     }
 
     public func togglePause() {

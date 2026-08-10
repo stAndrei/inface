@@ -24,6 +24,24 @@ final class AppModelFunctionalTests: XCTestCase {
         XCTAssertEqual(model.activeAlert?.id, "fx1")
     }
 
+    func testJoinChatZoneUsesDeepLink() {
+        let opener = MockLinkOpener()
+        let event = MeetingEvent(
+            id: "cz",
+            title: "ChatZone",
+            startDate: Date().addingTimeInterval(60),
+            endDate: Date().addingTimeInterval(600),
+            calendarId: "c",
+            calendarTitle: "Work",
+            notes: "https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169"
+        )
+        let model = AppModel(calendar: MockCalendarService(), linkOpener: opener)
+        XCTAssertTrue(model.joinMeeting(for: event))
+        XCTAssertEqual(opener.opened.first?.scheme, "mattermost")
+        XCTAssertEqual(opener.opened.first?.host, "chatzone.o3t.ru")
+        XCTAssertTrue(opener.opened.first?.query?.contains("showMeetInApp=true") == true)
+    }
+
     func testDeniedShowsNoEvents() {
         let model = AppModel(calendar: MockCalendarService(authorizationStatus: .denied, events: [
             MeetingEvent(

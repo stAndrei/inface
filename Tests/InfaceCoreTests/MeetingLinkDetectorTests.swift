@@ -36,4 +36,28 @@ final class MeetingLinkDetectorTests: XCTestCase {
             XCTAssertTrue(detector.isConferenceURL(URL(string: "https://\(host)/r")!), host)
         }
     }
+
+    func testDetectsChatZoneMeetLink() {
+        let event = MeetingEvent(
+            id: "cz",
+            title: "Синк",
+            startDate: Date(),
+            endDate: Date().addingTimeInterval(1800),
+            calendarId: "c",
+            calendarTitle: "Work",
+            notes: "Звонок https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169"
+        )
+        let url = detector.detect(in: event)
+        XCTAssertEqual(url?.host, "chatzone.o3t.ru")
+        XCTAssertTrue(url!.path.contains("6d54c167-7829-4d3e-80e8-3e0dd626b169"))
+    }
+
+    func testChatZoneLaunchURLOpensInAppDeepLink() {
+        let https = URL(string: "https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169")!
+        let launch = detector.launchURL(for: https)
+        XCTAssertEqual(launch.scheme, "mattermost")
+        XCTAssertEqual(launch.host, "chatzone.o3t.ru")
+        XCTAssertEqual(launch.path, "/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169")
+        XCTAssertTrue(launch.query?.contains("showMeetInApp=true") == true)
+    }
 }

@@ -82,6 +82,16 @@ func meetingLinkTests() -> Int {
         let url = URL(string: "https://\(host)/room/1")!
         f += expect(detector.isConferenceURL(url), "provider \(host)")
     }
+
+    let czEvent = MeetingEvent(
+        id: "cz", title: "Синк", startDate: Date(), endDate: Date().addingTimeInterval(1800),
+        calendarId: "c", calendarTitle: "Work",
+        notes: "https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169"
+    )
+    f += expect(detector.detect(in: czEvent)?.host == "chatzone.o3t.ru", "chatzone detect")
+    let launch = detector.launchURL(for: URL(string: "https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169")!)
+    f += expect(launch.scheme == "mattermost", "chatzone scheme")
+    f += expect(launch.query?.contains("showMeetInApp=true") == true, "chatzone showMeetInApp")
     return f
 }
 

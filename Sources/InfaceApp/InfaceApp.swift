@@ -8,8 +8,8 @@ struct InfaceApp: App {
     @StateObject private var loginItem = LoginItemController()
 
     init() {
-        let calendar = EventKitCalendarService()
-        let model = AppModel(calendar: calendar)
+        let router = CalendarSourceRouter(source: AppSettingsStore.load().calendarSource)
+        let model = AppModel(calendarRouter: router)
         _model = StateObject(wrappedValue: model)
         _alertPresenter = StateObject(wrappedValue: AlertPresenter(model: model))
     }

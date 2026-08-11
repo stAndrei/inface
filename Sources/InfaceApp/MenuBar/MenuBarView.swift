@@ -63,6 +63,7 @@ struct MenuBarView: View {
         .background(
             PopoverShownObserver {
                 model.goToToday()
+                model.reloadEvents()
                 selectedEvent = nil
             }
         )
@@ -166,21 +167,41 @@ struct MenuBarView: View {
     private var content: some View {
         switch model.authStatus {
         case .notDetermined:
-            emptyState(
-                title: "Календари ещё не подключены",
-                button: "Запросить доступ к Календарю"
-            ) {
-                Task { await model.requestAccess() }
+            if model.usesExchange {
+                emptyState(
+                    title: "Exchange ещё не подключён",
+                    button: "Открыть настройки"
+                ) {
+                    model.openSettings()
+                }
+                .padding(.horizontal, 18)
+            } else {
+                emptyState(
+                    title: "Календари ещё не подключены",
+                    button: "Запросить доступ к Календарю"
+                ) {
+                    Task { await model.requestAccess() }
+                }
+                .padding(.horizontal, 18)
             }
-            .padding(.horizontal, 18)
         case .denied, .restricted:
-            emptyState(
-                title: "Нет доступа к Календарю",
-                button: "Открыть настройки"
-            ) {
-                model.openSystemCalendarPrivacy()
+            if model.usesExchange {
+                emptyState(
+                    title: "Не удалось войти в Exchange",
+                    button: "Открыть настройки"
+                ) {
+                    model.openSettings()
+                }
+                .padding(.horizontal, 18)
+            } else {
+                emptyState(
+                    title: "Нет доступа к Календарю",
+                    button: "Открыть настройки"
+                ) {
+                    model.openSystemCalendarPrivacy()
+                }
+                .padding(.horizontal, 18)
             }
-            .padding(.horizontal, 18)
         case .authorized:
             DayTimelineView(
                 timeline: DayTimelineBuilder.build(

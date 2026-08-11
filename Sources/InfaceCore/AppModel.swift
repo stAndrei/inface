@@ -8,33 +8,41 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var events: [MeetingEvent] = []
     @Published public var selectedDay: Date
     @Published public var settings: AppSettings {
-        didSet { scheduler.updateSettings(settings) }
+        didSet {
+            scheduler.updateSettings(settings)
+            applyCalendarSettings()
+            AppSettingsStore.save(settings)
+        }
     }
     @Published public var activeAlert: MeetingEvent?
     @Published public var lastError: String?
+    @Published public var exchangeLoginInProgress = false
 
-    public let calendar: CalendarAccessing
+    public let calendarRouter: CalendarSourceRouter
     public let scheduler: AlertScheduler
     public let linkDetector: MeetingLinkDetector
     public let linkOpener: LinkOpening
 
+    public var calendar: CalendarAccessing { calendarRouter }
+
     private let schedulerHorizon: TimeInterval = 48 * 60 * 60
     private var wakeObserver: NSObjectProtocol?
+    private var isObserving = false
 
     public init(
-        calendar: CalendarAccessing,
+        calendarRouter: CalendarSourceRouter,
         scheduler: AlertScheduler = AlertScheduler(),
         linkDetector: MeetingLinkDetector = .shared,
         linkOpener: LinkOpening = WorkspaceLinkOpener(),
-        settings: AppSettings = .default,
+        settings: AppSettings = AppSettingsStore.load(),
         selectedDay: Date = Date()
     ) {
-        self.calendar = calendar
+        self.calendarRouter = calendarRouter
         self.scheduler = scheduler
         self.linkDetector = linkDetector
         self.linkOpener = linkOpener
         self.settings = settings
-        self.authStatus = calendar.authorizationStatus
+        self.authStatus = calendarRouter.authorizationStatus
         self.selectedDay = Calendar.current.startOfDay(for: selectedDay)
         self.scheduler.updateSettings(settings)
         self.scheduler.onFire = { [weak self] event in
@@ -42,10 +50,43 @@ public final class AppModel: ObservableObject {
                 self?.activeAlert = event
             }
         }
+        applyCalendarSettings(initial: true)
+    }
+
+    public convenience init(
+        calendar: CalendarAccessing,
+        scheduler: AlertScheduler = AlertScheduler(),
+        linkDetector: MeetingLinkDetector = .shared,
+        linkOpener: LinkOpening = WorkspaceLinkOpener(),
+        settings: AppSettings = AppSettingsStore.load(),
+        selectedDay: Date = Date()
+    ) {
+        let router: CalendarSourceRouter
+        if let existing = calendar as? CalendarSourceRouter {
+            router = existing
+        } else {
+            router = CalendarSourceRouter(
+                source: settings.calendarSource,
+                eventKit: calendar,
+                exchange: EWSCalendarService()
+            )
+        }
+        self.init(
+            calendarRouter: router,
+            scheduler: scheduler,
+            linkDetector: linkDetector,
+            linkOpener: linkOpener,
+            settings: settings,
+            selectedDay: selectedDay
+        )
     }
 
     public var isSelectedDayToday: Bool {
         Calendar.current.isDateInToday(selectedDay)
+    }
+
+    public var usesExchange: Bool {
+        settings.calendarSource == .exchange
     }
 
     /// Meetings overlapping the currently selected day.
@@ -87,35 +128,65 @@ public final class AppModel: ObservableObject {
     }
 
     public func start() {
-        authStatus = calendar.authorizationStatus
-        calendar.startObservingChanges { [weak self] in
-            Task { @MainActor in
-                self?.reloadEvents()
-            }
-        }
+        restartObserving()
+        authStatus = calendarRouter.authorizationStatus
         if authStatus == .authorized {
             reloadEvents()
         }
-        wakeObserver = NotificationCenter.default.addObserver(
-            forName: NSWorkspace.didWakeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.scheduler.handleWake()
+        if wakeObserver == nil {
+            wakeObserver = NotificationCenter.default.addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.scheduler.handleWake()
+                    self?.reloadEvents()
+                }
             }
         }
     }
 
     public func requestAccess() async {
-        _ = await calendar.requestAccess()
-        authStatus = calendar.authorizationStatus
+        _ = await calendarRouter.requestAccess()
+        authStatus = calendarRouter.authorizationStatus
         if authStatus == .authorized {
             reloadEvents()
         }
     }
 
+    public func exchangeLogin(username: String, password: String) async {
+        exchangeLoginInProgress = true
+        lastError = nil
+        defer { exchangeLoginInProgress = false }
+        do {
+            try await calendarRouter.exchange.login(
+                username: username,
+                password: password,
+                endpoint: settings.exchangeEndpoint
+            )
+            settings.exchangeUsername = username
+            authStatus = calendarRouter.authorizationStatus
+            reloadEvents()
+        } catch {
+            authStatus = calendarRouter.authorizationStatus
+            lastError = EWSErrorLocalized.message(for: error)
+        }
+    }
+
+    public func exchangeLogout() {
+        do {
+            try calendarRouter.exchange.logout()
+            authStatus = calendarRouter.authorizationStatus
+            events = []
+            lastError = nil
+        } catch {
+            lastError = EWSErrorLocalized.message(for: error)
+        }
+    }
+
     public func reloadEvents() {
+        authStatus = calendarRouter.authorizationStatus
         guard authStatus == .authorized else {
             events = []
             return
@@ -128,11 +199,11 @@ public final class AppModel: ObservableObject {
         let fetchStart = min(selectedStart, todayStart)
         let fetchEnd = max(selectedEnd, now.addingTimeInterval(schedulerHorizon))
         do {
-            events = try calendar.fetchEvents(from: fetchStart, to: fetchEnd)
+            events = try calendarRouter.fetchEvents(from: fetchStart, to: fetchEnd)
             scheduler.updateEvents(events.filter { $0.endDate > now })
             lastError = nil
         } catch {
-            lastError = error.localizedDescription
+            lastError = EWSErrorLocalized.message(for: error)
         }
     }
 
@@ -146,6 +217,10 @@ public final class AppModel: ObservableObject {
                 return
             }
         }
+    }
+
+    public func openSettings() {
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     public func dismissAlert() {
@@ -177,5 +252,30 @@ public final class AppModel: ObservableObject {
 
     public func forceAlert(_ event: MeetingEvent) {
         activeAlert = event
+    }
+
+    private func applyCalendarSettings(initial: Bool = false) {
+        calendarRouter.setSource(settings.calendarSource)
+        calendarRouter.configureExchange(
+            endpoint: settings.exchangeEndpoint,
+            username: settings.exchangeUsername
+        )
+        authStatus = calendarRouter.authorizationStatus
+        if !initial {
+            restartObserving()
+            reloadEvents()
+        }
+    }
+
+    private func restartObserving() {
+        if isObserving {
+            calendarRouter.stopObservingChanges()
+        }
+        calendarRouter.startObservingChanges { [weak self] in
+            Task { @MainActor in
+                self?.reloadEvents()
+            }
+        }
+        isObserving = true
     }
 }

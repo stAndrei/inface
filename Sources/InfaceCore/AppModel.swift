@@ -220,7 +220,17 @@ public final class AppModel: ObservableObject {
     }
 
     public func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        NSApp.activate(ignoringOtherApps: true)
+        if NSApp.responds(to: Selector(("showSettingsWindow:"))) {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        } else if NSApp.responds(to: Selector(("showPreferencesWindow:"))) {
+            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+        }
+    }
+
+    public func openExchangeSetup() {
+        settings.calendarSource = .exchange
+        openSettings()
     }
 
     public func dismissAlert() {

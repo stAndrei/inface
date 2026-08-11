@@ -33,5 +33,13 @@ struct InfaceApp: App {
                 .environmentObject(model)
                 .environmentObject(loginItem)
         }
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Настройки Inface…") {
+                    model.openSettings()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
     }
 }

@@ -31,6 +31,7 @@ Changes: `bootstrap-mac-app` → `add-eventkit-sync` → `add-fullscreen-alerts`
 - QA checklist Pass или N/A
 - openspec archive + локальный git commit
 - после изменений Swift/UI: `./Scripts/reload-app.sh` (пересборка `dist/Inface.app` + перезапуск)
+- **релиз** (когда просят): обновить README → bump version в Info.plist → `swift test` → `./Scripts/package-dmg.sh` → push → merge в `main` → GitHub Release + DMG
 
 ## Эскалация человеку
 

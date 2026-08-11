@@ -13,6 +13,7 @@
 - [ ] Exchange (EWS): Settings → Exchange → логин `имя@ozon.ru`, пароль `код:пароль` из @mail-bot
 - [ ] Exchange: события видны в popover без Calendar.app
 - [ ] Exchange: popover reload при открытии иконки
+- [ ] Exchange: в карточке встречи есть заметки и «Подключиться» на ChatZone Meetzone UUID
 - [x] Fullscreen алерт за ~1 мин до тестовой встречи
 - [ ] «Подключиться» открывает Teams/Zoom из события
 - [ ] «Пауза» глушит алерты

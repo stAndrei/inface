@@ -141,7 +141,8 @@ public final class AppModel: ObservableObject {
         authStatus = calendarRouter.authorizationStatus
         if authStatus == .authorized {
             loadCachedEvents()
-            refreshEventsInBackground()
+            // Always refresh Exchange in background so notes/links catch up after GetItem fix.
+            refreshEventsInBackground(forceImmediate: settings.calendarSource == .exchange)
         }
     }
 
@@ -354,6 +355,11 @@ public final class AppModel: ObservableObject {
         scheduler.updateEvents(fetched.filter { $0.endDate > Date() })
         lastError = nil
         authStatus = calendarRouter.authorizationStatus
+    }
+
+    /// Drop stale Exchange cache that may lack Body/notes from older FindItem-only fetches.
+    public func invalidateExchangeCache() {
+        eventsCache.clear(source: .exchange)
     }
 
     private func fetchRange() -> (start: Date, end: Date) {

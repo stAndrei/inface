@@ -44,7 +44,9 @@ public final class EventsCacheStore: EventsCaching, @unchecked Sendable {
     }
 
     private func fileURL(for source: CalendarSource) -> URL {
-        directory.appendingPathComponent("events-\(source.rawValue).json")
+        // v2: Exchange events include Body/notes from GetItem.
+        let version = source == .exchange ? "v2" : "v1"
+        return directory.appendingPathComponent("events-\(source.rawValue)-\(version).json")
     }
 }
 

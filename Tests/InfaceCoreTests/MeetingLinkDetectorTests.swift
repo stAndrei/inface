@@ -60,8 +60,8 @@ final class MeetingLinkDetectorTests: XCTestCase {
             endDate: Date().addingTimeInterval(1800),
             calendarId: "c",
             calendarTitle: "Work",
-            url: URL(string: "https://chatzone.o3t.ru/meet/town-square"),
-            notes: "https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169"
+            notes: "https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169",
+            url: URL(string: "https://chatzone.o3t.ru/meet/town-square")
         )
         let url = detector.detect(in: event)
         XCTAssertEqual(url?.path, "/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169")

@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Fires when the menu bar popover window is shown again.
+/// Fires when the menu bar popover window becomes key again after being dismissed.
 struct PopoverShownObserver: NSViewRepresentable {
     let onShown: () -> Void
 
@@ -17,6 +17,7 @@ struct PopoverShownObserver: NSViewRepresentable {
 
     final class ObservingView: NSView {
         var onShown: (() -> Void)?
+        private var isPopoverKey = false
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -25,14 +26,26 @@ struct PopoverShownObserver: NSViewRepresentable {
             NotificationCenter.default.removeObserver(self)
             NotificationCenter.default.addObserver(
                 self,
-                selector: #selector(windowWillShow),
-                name: NSWindow.willOrderFrontNotification,
+                selector: #selector(windowDidBecomeKey),
+                name: NSWindow.didBecomeKeyNotification,
+                object: window
+            )
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowDidResignKey),
+                name: NSWindow.didResignKeyNotification,
                 object: window
             )
         }
 
-        @objc private func windowWillShow() {
+        @objc private func windowDidBecomeKey() {
+            guard !isPopoverKey else { return }
+            isPopoverKey = true
             onShown?()
+        }
+
+        @objc private func windowDidResignKey() {
+            isPopoverKey = false
         }
 
         deinit {

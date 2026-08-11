@@ -6,6 +6,7 @@ import Foundation
 public final class AppModel: ObservableObject {
     @Published public private(set) var authStatus: CalendarAuthStatus
     @Published public private(set) var events: [MeetingEvent] = []
+    @Published public private(set) var isRefreshing = false
     @Published public var selectedDay: Date
     @Published public var settings: AppSettings {
         didSet {
@@ -22,18 +23,21 @@ public final class AppModel: ObservableObject {
     public let scheduler: AlertScheduler
     public let linkDetector: MeetingLinkDetector
     public let linkOpener: LinkOpening
+    public let eventsCache: EventsCaching
 
     public var calendar: CalendarAccessing { calendarRouter }
 
     private let schedulerHorizon: TimeInterval = 48 * 60 * 60
     private var wakeObserver: NSObjectProtocol?
     private var isObserving = false
+    private var refreshTask: Task<Void, Never>?
 
     public init(
         calendarRouter: CalendarSourceRouter,
         scheduler: AlertScheduler = AlertScheduler(),
         linkDetector: MeetingLinkDetector = .shared,
         linkOpener: LinkOpening = WorkspaceLinkOpener(),
+        eventsCache: EventsCaching = EventsCacheStore(),
         settings: AppSettings = AppSettingsStore.load(),
         selectedDay: Date = Date()
     ) {
@@ -41,6 +45,7 @@ public final class AppModel: ObservableObject {
         self.scheduler = scheduler
         self.linkDetector = linkDetector
         self.linkOpener = linkOpener
+        self.eventsCache = eventsCache
         self.settings = settings
         self.authStatus = calendarRouter.authorizationStatus
         self.selectedDay = Calendar.current.startOfDay(for: selectedDay)
@@ -51,6 +56,7 @@ public final class AppModel: ObservableObject {
             }
         }
         applyCalendarSettings(initial: true)
+        loadCachedEvents()
     }
 
     public convenience init(
@@ -58,6 +64,7 @@ public final class AppModel: ObservableObject {
         scheduler: AlertScheduler = AlertScheduler(),
         linkDetector: MeetingLinkDetector = .shared,
         linkOpener: LinkOpening = WorkspaceLinkOpener(),
+        eventsCache: EventsCaching = EventsCacheStore(),
         settings: AppSettings = AppSettingsStore.load(),
         selectedDay: Date = Date()
     ) {
@@ -76,6 +83,7 @@ public final class AppModel: ObservableObject {
             scheduler: scheduler,
             linkDetector: linkDetector,
             linkOpener: linkOpener,
+            eventsCache: eventsCache,
             settings: settings,
             selectedDay: selectedDay
         )
@@ -118,20 +126,31 @@ public final class AppModel: ObservableObject {
         let cal = Calendar.current
         if let next = cal.date(byAdding: .day, value: value, to: selectedDay) {
             selectedDay = cal.startOfDay(for: next)
-            reloadEvents()
+            refreshEventsInBackground()
         }
     }
 
     public func goToToday() {
         selectedDay = Calendar.current.startOfDay(for: Date())
-        reloadEvents()
+        refreshEventsInBackground()
+    }
+
+    /// Instant UI update from cache + background network refresh (popover open).
+    public func presentPopover() {
+        selectedDay = Calendar.current.startOfDay(for: Date())
+        authStatus = calendarRouter.authorizationStatus
+        if authStatus == .authorized {
+            loadCachedEvents()
+            refreshEventsInBackground()
+        }
     }
 
     public func start() {
         restartObserving()
         authStatus = calendarRouter.authorizationStatus
         if authStatus == .authorized {
-            reloadEvents()
+            loadCachedEvents()
+            refreshEventsInBackground()
         }
         if wakeObserver == nil {
             wakeObserver = NotificationCenter.default.addObserver(
@@ -141,7 +160,7 @@ public final class AppModel: ObservableObject {
             ) { [weak self] _ in
                 Task { @MainActor in
                     self?.scheduler.handleWake()
-                    self?.reloadEvents()
+                    self?.refreshEventsInBackground()
                 }
             }
         }
@@ -151,7 +170,7 @@ public final class AppModel: ObservableObject {
         _ = await calendarRouter.requestAccess()
         authStatus = calendarRouter.authorizationStatus
         if authStatus == .authorized {
-            reloadEvents()
+            refreshEventsInBackground()
         }
     }
 
@@ -167,7 +186,7 @@ public final class AppModel: ObservableObject {
             )
             settings.exchangeUsername = username
             authStatus = calendarRouter.authorizationStatus
-            reloadEvents()
+            refreshEventsInBackground()
         } catch {
             authStatus = calendarRouter.authorizationStatus
             lastError = EWSErrorLocalized.message(for: error)
@@ -179,31 +198,65 @@ public final class AppModel: ObservableObject {
             try calendarRouter.exchange.logout()
             authStatus = calendarRouter.authorizationStatus
             events = []
+            eventsCache.clear(source: .exchange)
             lastError = nil
         } catch {
             lastError = EWSErrorLocalized.message(for: error)
         }
     }
 
+    /// Synchronous reload kept for tests / manual «Обновить» when cache-first is not needed.
     public func reloadEvents() {
+        refreshEventsInBackground(forceImmediate: true)
+    }
+
+    public func refreshEventsInBackground(forceImmediate: Bool = false) {
         authStatus = calendarRouter.authorizationStatus
         guard authStatus == .authorized else {
             events = []
             return
         }
-        let cal = Calendar.current
-        let now = Date()
-        let selectedStart = cal.startOfDay(for: selectedDay)
-        let selectedEnd = cal.date(byAdding: .day, value: 1, to: selectedStart) ?? selectedStart.addingTimeInterval(24 * 3600)
-        let todayStart = cal.startOfDay(for: now)
-        let fetchStart = min(selectedStart, todayStart)
-        let fetchEnd = max(selectedEnd, now.addingTimeInterval(schedulerHorizon))
-        do {
-            events = try calendarRouter.fetchEvents(from: fetchStart, to: fetchEnd)
-            scheduler.updateEvents(events.filter { $0.endDate > now })
-            lastError = nil
-        } catch {
-            lastError = EWSErrorLocalized.message(for: error)
+
+        // EventKit / mocks are local — keep synchronous so UI and tests stay snappy.
+        if settings.calendarSource != .exchange {
+            do {
+                let range = fetchRange()
+                let fetched = try calendarRouter.fetchEvents(from: range.start, to: range.end)
+                applyFetchedEvents(fetched)
+                isRefreshing = false
+            } catch {
+                lastError = EWSErrorLocalized.message(for: error)
+            }
+            return
+        }
+
+        // Exchange: show cache immediately, refresh over the network in the background.
+        if !forceImmediate || events.isEmpty {
+            loadCachedEvents()
+        }
+
+        refreshTask?.cancel()
+        isRefreshing = true
+        let range = fetchRange()
+        let exchange = calendarRouter.exchange
+        refreshTask = Task { [weak self] in
+            do {
+                let fetched = try await exchange.fetchEventsAsync(from: range.start, to: range.end)
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self else { return }
+                    self.applyFetchedEvents(fetched)
+                    self.isRefreshing = false
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self else { return }
+                    self.lastError = EWSErrorLocalized.message(for: error)
+                    self.authStatus = self.calendarRouter.authorizationStatus
+                    self.isRefreshing = false
+                }
+            }
         }
     }
 
@@ -229,8 +282,11 @@ public final class AppModel: ObservableObject {
     }
 
     public func openExchangeSetup() {
-        settings.calendarSource = .exchange
+        // Open settings first so UI appears immediately; source switch must not block on network.
         openSettings()
+        if settings.calendarSource != .exchange {
+            settings.calendarSource = .exchange
+        }
     }
 
     public func dismissAlert() {
@@ -273,8 +329,42 @@ public final class AppModel: ObservableObject {
         authStatus = calendarRouter.authorizationStatus
         if !initial {
             restartObserving()
-            reloadEvents()
+            loadCachedEvents()
+            // Don't block Settings UI when switching to Exchange without credentials.
+            if authStatus == .authorized {
+                refreshEventsInBackground()
+            } else {
+                events = []
+            }
         }
+    }
+
+    private func loadCachedEvents() {
+        guard authStatus == .authorized else { return }
+        let cached = eventsCache.load(source: settings.calendarSource)
+        if !cached.isEmpty {
+            events = cached
+            scheduler.updateEvents(cached.filter { $0.endDate > Date() })
+        }
+    }
+
+    private func applyFetchedEvents(_ fetched: [MeetingEvent]) {
+        events = fetched
+        eventsCache.save(fetched, source: settings.calendarSource)
+        scheduler.updateEvents(fetched.filter { $0.endDate > Date() })
+        lastError = nil
+        authStatus = calendarRouter.authorizationStatus
+    }
+
+    private func fetchRange() -> (start: Date, end: Date) {
+        let cal = Calendar.current
+        let now = Date()
+        let selectedStart = cal.startOfDay(for: selectedDay)
+        let selectedEnd = cal.date(byAdding: .day, value: 1, to: selectedStart) ?? selectedStart.addingTimeInterval(24 * 3600)
+        let todayStart = cal.startOfDay(for: now)
+        let fetchStart = min(selectedStart, todayStart)
+        let fetchEnd = max(selectedEnd, now.addingTimeInterval(schedulerHorizon))
+        return (fetchStart, fetchEnd)
     }
 
     private func restartObserving() {
@@ -283,7 +373,7 @@ public final class AppModel: ObservableObject {
         }
         calendarRouter.startObservingChanges { [weak self] in
             Task { @MainActor in
-                self?.reloadEvents()
+                self?.refreshEventsInBackground()
             }
         }
         isObserving = true

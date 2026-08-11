@@ -21,11 +21,21 @@ struct SettingsView: View {
 
     private var calendarSection: some View {
         Section("Календарь") {
-            Picker("Источник", selection: $model.settings.calendarSource) {
+            Picker("Источник", selection: Binding(
+                get: { model.settings.calendarSource },
+                set: { newValue in
+                    model.settings.calendarSource = newValue
+                    if newValue == .exchange {
+                        // Bring settings to front immediately when switching to Exchange.
+                        model.openSettings()
+                    }
+                }
+            )) {
                 ForEach(CalendarSource.allCases) { source in
                     Text(source.displayName).tag(source)
                 }
             }
+            .pickerStyle(.segmented)
 
             if model.settings.calendarSource == .exchange {
                 exchangeInstructions
@@ -56,6 +66,7 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    .buttonStyle(.borderedProminent)
                     .disabled(
                         model.exchangeLoginInProgress
                             || model.settings.exchangeUsername.trimmingCharacters(in: .whitespaces).isEmpty

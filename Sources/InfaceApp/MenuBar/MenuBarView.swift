@@ -63,8 +63,7 @@ struct MenuBarView: View {
         .opacity(appeared ? 1 : 0)
         .background(
             PopoverShownObserver {
-                model.goToToday()
-                model.reloadEvents()
+                model.presentPopover()
                 selectedEvent = nil
             }
         )
@@ -204,7 +203,8 @@ struct MenuBarView: View {
                     Button("Подключить Exchange…") {
                         model.openExchangeSetup()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .tint(InfaceTheme.accent)
                     .controlSize(.large)
                     Text("Exchange: логин @ozon.ru и пароль код:пароль из @mail-bot в Chatzone — в настройках.")
                         .font(.callout)

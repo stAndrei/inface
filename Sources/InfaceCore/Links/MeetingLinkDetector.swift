@@ -35,41 +35,75 @@ public struct MeetingLinkDetector: Sendable {
         )
     }()
 
+    private let meetUUIDRegex: NSRegularExpression = {
+        try! NSRegularExpression(
+            pattern: #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"#,
+            options: []
+        )
+    }()
+
     public init() {}
 
     public func detect(in event: MeetingEvent) -> URL? {
-        if let url = event.url, isConferenceURL(url) {
-            return url
-        }
-        if let notes = event.notes, let url = firstConferenceURL(in: notes) {
-            return url
-        }
-        if let location = event.location, let url = firstConferenceURL(in: location) {
-            return url
-        }
-        return nil
+        selectBestConferenceURL(from: conferenceURLCandidates(in: event))
     }
 
-    public func firstConferenceURL(in text: String) -> URL? {
+    private func conferenceURLCandidates(in event: MeetingEvent) -> [URL] {
+        var candidates: [URL] = []
+        if let notes = event.notes {
+            candidates.append(contentsOf: allConferenceURLs(in: notes))
+        }
+        if let location = event.location {
+            candidates.append(contentsOf: allConferenceURLs(in: location))
+        }
+        if let url = event.url, isConferenceURL(url) {
+            candidates.append(url)
+        }
+        return candidates
+    }
+
+    private func selectBestConferenceURL(from candidates: [URL]) -> URL? {
+        guard !candidates.isEmpty else { return nil }
+
+        if let uuidMeet = candidates.first(where: isChatZoneMeetUUID) {
+            return uuidMeet
+        }
+
+        if let strong = candidates.first(where: { !isWeakChatZoneURL($0) }) {
+            return strong
+        }
+
+        return candidates.first
+    }
+
+    public func allConferenceURLs(in text: String) -> [URL] {
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         let matches = urlRegex.matches(in: text, options: [], range: range)
+        var urls: [URL] = []
+
         for match in matches {
             guard let swiftRange = Range(match.range, in: text) else { continue }
             var raw = String(text[swiftRange])
             while let last = raw.last, ".,);]".contains(last) {
                 raw.removeLast()
             }
-            if let url = URL(string: raw), isConferenceURL(url) {
-                return url
+            guard let url = URL(string: raw), isConferenceURL(url) else { continue }
+            if !urls.contains(url) {
+                urls.append(url)
             }
         }
-        return nil
+
+        return urls
+    }
+
+    public func firstConferenceURL(in text: String) -> URL? {
+        allConferenceURLs(in: text).first
     }
 
     public func isConferenceURL(_ url: URL) -> Bool {
         guard let host = url.host?.lowercased() else { return false }
         if isChatZoneHost(host) {
-            return true
+            return !isWeakChatZoneURL(url)
         }
         let path = url.path.lowercased()
         if (host == "msg.o3.ru" || host == "msg-beta.o3.ru"), path.hasPrefix("/meet") {
@@ -91,7 +125,7 @@ public struct MeetingLinkDetector: Sendable {
         components.fragment = source.fragment
 
         var items = URLComponents(url: source, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        if isChatZoneMeetURL(source) {
+        if isChatZoneMeetUUID(source) {
             items.removeAll { $0.name == "showMeetInApp" || $0.name == "openMeetInApp" }
             items.append(URLQueryItem(name: "showMeetInApp", value: "true"))
         }
@@ -121,14 +155,39 @@ public struct MeetingLinkDetector: Sendable {
     }
 
     public func isChatZoneMeetURL(_ url: URL) -> Bool {
+        isChatZoneMeetUUID(url)
+    }
+
+    public func isChatZoneMeetUUID(_ url: URL) -> Bool {
         let url = httpsURL(from: url)
         guard let host = url.host?.lowercased() else { return false }
+        guard isChatZoneHost(host) || host == "msg.o3.ru" || host == "msg-beta.o3.ru" else { return false }
+
+        let slug = chatZoneMeetSlug(from: url)
+        guard !slug.isEmpty else { return false }
+
+        let range = NSRange(slug.startIndex..<slug.endIndex, in: slug)
+        return meetUUIDRegex.firstMatch(in: slug, options: [], range: range) != nil
+    }
+
+    /// Exchange often puts `/meet/town-square` in the URL field — not a real meet link.
+    public func isWeakChatZoneURL(_ url: URL) -> Bool {
+        guard isChatZoneHost(url.host?.lowercased() ?? "") else { return false }
         let path = url.path.lowercased()
-        let isMeetPath = path.hasPrefix("/meet/") || path == "/meet"
-        guard isMeetPath else { return false }
-        return isChatZoneHost(host)
-            || host == "msg.o3.ru"
-            || host == "msg-beta.o3.ru"
+        if path.hasPrefix("/meet/"), !isChatZoneMeetUUID(url) {
+            return true
+        }
+        if path.contains("/channels/") {
+            return true
+        }
+        return false
+    }
+
+    private func chatZoneMeetSlug(from url: URL) -> String {
+        let path = url.path
+        guard path.hasPrefix("/meet/") else { return "" }
+        let remainder = String(path.dropFirst("/meet/".count))
+        return remainder.split(separator: "/").first.map(String.init) ?? ""
     }
 
     public func isChatZoneHost(_ host: String) -> Bool {

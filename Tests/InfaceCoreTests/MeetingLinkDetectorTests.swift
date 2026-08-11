@@ -52,6 +52,34 @@ final class MeetingLinkDetectorTests: XCTestCase {
         XCTAssertTrue(url!.path.contains("6d54c167-7829-4d3e-80e8-3e0dd626b169"))
     }
 
+    func testPrefersMeetUUIDInNotesOverExchangeURLField() {
+        let event = MeetingEvent(
+            id: "cz-exchange",
+            title: "Синк",
+            startDate: Date(),
+            endDate: Date().addingTimeInterval(1800),
+            calendarId: "c",
+            calendarTitle: "Work",
+            url: URL(string: "https://chatzone.o3t.ru/meet/town-square"),
+            notes: "https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169"
+        )
+        let url = detector.detect(in: event)
+        XCTAssertEqual(url?.path, "/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169")
+    }
+
+    func testIgnoresWeakChatZoneSlugInURLFieldWhenNoNotes() {
+        let event = MeetingEvent(
+            id: "cz-weak",
+            title: "Синк",
+            startDate: Date(),
+            endDate: Date().addingTimeInterval(1800),
+            calendarId: "c",
+            calendarTitle: "Work",
+            url: URL(string: "https://chatzone.o3t.ru/meet/town-square")
+        )
+        XCTAssertNil(detector.detect(in: event))
+    }
+
     func testChatZoneLaunchURLOpensInAppDeepLink() {
         let https = URL(string: "https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169")!
         let launch = detector.launchURL(for: https)

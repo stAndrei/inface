@@ -60,6 +60,12 @@ struct MenuBarView: View {
         .frame(width: 520, height: 740)
         .background(InfaceTheme.background)
         .opacity(appeared ? 1 : 0)
+        .background(
+            PopoverShownObserver {
+                model.goToToday()
+                selectedEvent = nil
+            }
+        )
         .onAppear {
             model.start()
             withAnimation(.easeOut(duration: 0.2)) { appeared = true }

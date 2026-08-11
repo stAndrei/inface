@@ -1,0 +1,19 @@
+---
+description: Release workflow for Inface — update docs, DMG, push, merge, GitHub release
+alwaysApply: true
+---
+
+# Inface release workflow
+
+When the user asks for a **релиз** / release (or after a feature is done and they say to release):
+
+1. Update user-facing docs (`README.md`, `docs/qa-checklist.md` as needed).
+2. Bump `CFBundleShortVersionString` / `CFBundleVersion` in `Sources/InfaceApp/Info.plist`.
+3. Run tests: `swift test`.
+4. Build DMG: `./Scripts/package-dmg.sh` → `dist/Inface-<version>.dmg`.
+5. Commit, **push** the branch.
+6. **Merge** into `main` (PR merge via `gh pr merge` or merge locally + push `main`).
+7. Create **GitHub Release** with tag `v<version>`, attach the DMG, write RU/EN notes of what shipped.
+8. Reload local app: `./Scripts/reload-app.sh`.
+
+Do not skip DMG attach or merge when the user asked for a full release.

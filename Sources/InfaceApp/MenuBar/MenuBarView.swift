@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.openSettings) private var openSettings
     @State private var appeared = false
     @State private var selectedEvent: MeetingEvent?
 
@@ -62,7 +63,7 @@ struct MenuBarView: View {
         .opacity(appeared ? 1 : 0)
         .background(
             PopoverShownObserver {
-                model.goToToday()
+                model.presentPopover()
                 selectedEvent = nil
             }
         )
@@ -90,7 +91,24 @@ struct MenuBarView: View {
                     .background(InfaceTheme.accent.opacity(0.15))
                     .clipShape(Capsule())
             }
+            Button {
+                openAppSettings()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(InfaceTheme.textSecondary)
+                    .frame(width: 36, height: 36)
+                    .background(InfaceTheme.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help("Настройки")
         }
+    }
+
+    private func openAppSettings() {
+        openSettings()
+        model.openSettings()
     }
 
     private var daySwitcher: some View {
@@ -166,21 +184,52 @@ struct MenuBarView: View {
     private var content: some View {
         switch model.authStatus {
         case .notDetermined:
-            emptyState(
-                title: "Календари ещё не подключены",
-                button: "Запросить доступ к Календарю"
-            ) {
-                Task { await model.requestAccess() }
+            if model.usesExchange {
+                emptyState(
+                    title: "Exchange ещё не подключён",
+                    button: "Открыть настройки"
+                ) {
+                    model.openSettings()
+                }
+                .padding(.horizontal, 18)
+            } else {
+                VStack(alignment: .leading, spacing: 14) {
+                    emptyState(
+                        title: "Календари ещё не подключены",
+                        button: "Запросить доступ к Календарю"
+                    ) {
+                        Task { await model.requestAccess() }
+                    }
+                    Button("Подключить Exchange…") {
+                        model.openExchangeSetup()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(InfaceTheme.accent)
+                    .controlSize(.large)
+                    Text("Exchange: логин @ozon.ru и пароль код:пароль из @mail-bot в Chatzone — в настройках.")
+                        .font(.callout)
+                        .foregroundStyle(InfaceTheme.textSecondary)
+                }
+                .padding(.horizontal, 18)
             }
-            .padding(.horizontal, 18)
         case .denied, .restricted:
-            emptyState(
-                title: "Нет доступа к Календарю",
-                button: "Открыть настройки"
-            ) {
-                model.openSystemCalendarPrivacy()
+            if model.usesExchange {
+                emptyState(
+                    title: "Не удалось войти в Exchange",
+                    button: "Открыть настройки"
+                ) {
+                    model.openSettings()
+                }
+                .padding(.horizontal, 18)
+            } else {
+                emptyState(
+                    title: "Нет доступа к Календарю",
+                    button: "Открыть настройки"
+                ) {
+                    model.openSystemCalendarPrivacy()
+                }
+                .padding(.horizontal, 18)
             }
-            .padding(.horizontal, 18)
         case .authorized:
             DayTimelineView(
                 timeline: DayTimelineBuilder.build(
@@ -219,6 +268,13 @@ struct MenuBarView: View {
             }
 
             Spacer()
+
+            Button("Настройки") {
+                openAppSettings()
+            }
+            .buttonStyle(.plain)
+            .font(.body.weight(.medium))
+            .foregroundStyle(InfaceTheme.textSecondary)
 
             Button("Обновить") {
                 model.reloadEvents()

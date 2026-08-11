@@ -102,12 +102,9 @@ public struct MeetingLinkDetector: Sendable {
 
     public func isConferenceURL(_ url: URL) -> Bool {
         guard let host = url.host?.lowercased() else { return false }
-        if isChatZoneHost(host) {
-            return !isWeakChatZoneURL(url)
-        }
-        let path = url.path.lowercased()
-        if (host == "msg.o3.ru" || host == "msg-beta.o3.ru"), path.hasPrefix("/meet") {
-            return true
+        // ChatZone / msg: only real Meetzone UUID links — not channels or /meet/town-square.
+        if isChatZoneHost(host) || host == "msg.o3.ru" || host == "msg-beta.o3.ru" {
+            return isChatZoneMeetUUID(url)
         }
         return hostMarkers.contains { host == $0 || host.hasSuffix(".\($0)") }
     }
@@ -120,7 +117,8 @@ public struct MeetingLinkDetector: Sendable {
 
         var components = URLComponents()
         components.scheme = "mattermost"
-        components.host = source.host
+        // Desktop Meetzone expects chatzone.o3t.ru, not msg.o3.ru aliases.
+        components.host = canonicalChatZoneHost(source.host)
         components.path = source.path.isEmpty ? "/" : source.path
         components.fragment = source.fragment
 
@@ -172,15 +170,17 @@ public struct MeetingLinkDetector: Sendable {
 
     /// Exchange often puts `/meet/town-square` in the URL field — not a real meet link.
     public func isWeakChatZoneURL(_ url: URL) -> Bool {
-        guard isChatZoneHost(url.host?.lowercased() ?? "") else { return false }
+        let host = url.host?.lowercased() ?? ""
+        guard isChatZoneHost(host) || host == "msg.o3.ru" || host == "msg-beta.o3.ru" else {
+            return false
+        }
+        if isChatZoneMeetUUID(url) { return false }
         let path = url.path.lowercased()
-        if path.hasPrefix("/meet/"), !isChatZoneMeetUUID(url) {
+        if path.hasPrefix("/meet/") { return true }
+        if path.contains("/channels/") || path.contains("/messages/") || path.contains("/pl/") {
             return true
         }
-        if path.contains("/channels/") {
-            return true
-        }
-        return false
+        return true
     }
 
     private func chatZoneMeetSlug(from url: URL) -> String {
@@ -195,6 +195,15 @@ public struct MeetingLinkDetector: Sendable {
         if host == "chatzone.o3t.ru" || host.hasSuffix(".chatzone.o3t.ru") { return true }
         if host == "chatzone.o3.ru" || host.hasSuffix(".chatzone.o3.ru") { return true }
         return host.contains("chatzone") && (host.hasSuffix(".o3t.ru") || host.hasSuffix(".o3.ru"))
+    }
+
+    public func canonicalChatZoneHost(_ host: String?) -> String {
+        let host = (host ?? "").lowercased()
+        if host == "msg.o3.ru" || host == "msg-beta.o3.ru" {
+            return "chatzone.o3t.ru"
+        }
+        if host.isEmpty { return "chatzone.o3t.ru" }
+        return host
     }
 }
 

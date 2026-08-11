@@ -8,8 +8,8 @@ struct InfaceApp: App {
     @StateObject private var loginItem = LoginItemController()
 
     init() {
-        let calendar = EventKitCalendarService()
-        let model = AppModel(calendar: calendar)
+        let router = CalendarSourceRouter(source: AppSettingsStore.load().calendarSource)
+        let model = AppModel(calendarRouter: router)
         _model = StateObject(wrappedValue: model)
         _alertPresenter = StateObject(wrappedValue: AlertPresenter(model: model))
     }
@@ -32,6 +32,14 @@ struct InfaceApp: App {
             SettingsView()
                 .environmentObject(model)
                 .environmentObject(loginItem)
+        }
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Настройки Inface…") {
+                    model.openSettings()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
         }
     }
 }

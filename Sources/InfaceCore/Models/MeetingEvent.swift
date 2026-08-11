@@ -1,6 +1,6 @@
 import Foundation
 
-public struct MeetingEvent: Identifiable, Equatable, Sendable {
+public struct MeetingEvent: Identifiable, Equatable, Sendable, Codable {
     public let id: String
     public var title: String
     public var startDate: Date

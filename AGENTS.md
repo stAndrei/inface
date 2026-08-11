@@ -30,6 +30,7 @@ Changes: `bootstrap-mac-app` → `add-eventkit-sync` → `add-fullscreen-alerts`
 - unit + functional green, coverage ≥70% на новый код
 - QA checklist Pass или N/A
 - openspec archive + локальный git commit
+- после изменений Swift/UI: `./Scripts/reload-app.sh` (пересборка `dist/Inface.app` + перезапуск)
 
 ## Эскалация человеку
 

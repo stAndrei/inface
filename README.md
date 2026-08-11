@@ -12,6 +12,20 @@ UI language: **Russian**.
 
 ---
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/assets/screenshot-timeline.jpg" alt="Inface menu bar timeline" width="360" />
+  &nbsp;&nbsp;
+  <img src="docs/assets/screenshot-alert.jpg" alt="Inface fullscreen alert" width="480" />
+</p>
+
+<p align="center">
+  <em>Menu bar day timeline · Fullscreen “Скоро встреча” alert</em>
+</p>
+
+---
+
 ## What it does
 
 | Feature | Details |

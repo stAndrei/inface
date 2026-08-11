@@ -66,9 +66,10 @@ After password rotation (~every 3 months), get a new code from @mail-bot and upd
 2. **Day switcher** — previous / next day, or jump to Today.
 3. **Meeting card** — click a block for title, time, location, notes, and join link.
 4. **Join** — **Подключиться** opens the meeting link (ChatZone Meetzone UUID links open in ChatZone.app).
-5. **Alert** — when a meeting is about to start, a fullscreen sheet appears:
+5. **Quit** — **Выйти** in the popover footer closes Inface.
+6. **Alert** — when a meeting is about to start, a fullscreen sheet appears:
    - join / dismiss / snooze / pause alerts
-6. **Settings**:
+7. **Settings**:
    - calendar source (EventKit / Exchange)
    - lead time (minutes)
    - pause alerts

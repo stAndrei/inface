@@ -1,3 +1,4 @@
+import AppKit
 import InfaceCore
 import SwiftUI
 
@@ -282,6 +283,14 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
             .font(.body.weight(.medium))
             .foregroundStyle(InfaceTheme.textSecondary)
+
+            Button("Выйти") {
+                NSApp.terminate(nil)
+            }
+            .buttonStyle(.plain)
+            .font(.body.weight(.medium))
+            .foregroundStyle(InfaceTheme.textSecondary)
+            .help("Закрыть Inface")
         }
     }
 

@@ -1,119 +1,119 @@
 <p align="center">
-  <img src="docs/assets/icon-readme.png" alt="Inface icon" width="160" height="160" />
+  <img src="docs/assets/icon-readme.png" alt="Иконка Inface" width="160" height="160" />
 </p>
 
 # Inface
 
-**Fullscreen meeting reminders for macOS** — so you actually notice the call before it starts.
+**Полноэкранные напоминания о встречах для macOS** — чтобы звонок нельзя было пропустить.
 
-Inface lives in the menu bar and can read calendars either via **Apple EventKit** (including Exchange already set up in Calendar.app) or via **direct corporate Exchange (EWS)** (`mailsec.o3t.ru`). About **one minute before** each meeting it shows a fullscreen alert. One click joins Zoom, Google Meet, Teams, ChatZone, and other common links.
+Inface живёт в строке меню и читает календари через **Apple EventKit** (включая Exchange из «Календаря») или через **прямой корпоративный Exchange (EWS)** (`mailsec.o3t.ru`). За **минуту до** начала встречи показывает полноэкранный алерт. Одним нажатием можно подключиться к Zoom, Google Meet, Teams, ChatZone и другим сервисам.
 
-UI language: **Russian**.
+Язык интерфейса: **русский**.
 
 ---
 
-## Screenshots
+## Скриншоты
 
 <p align="center">
-  <img src="docs/assets/screenshot-timeline.jpg" alt="Inface menu bar timeline" width="360" />
+  <img src="docs/assets/screenshot-timeline.jpg" alt="Таймлайн Inface в строке меню" width="360" />
   &nbsp;&nbsp;
-  <img src="docs/assets/screenshot-alert.jpg" alt="Inface fullscreen alert" width="480" />
+  <img src="docs/assets/screenshot-alert.jpg" alt="Полноэкранный алерт Inface" width="480" />
 </p>
 
 <p align="center">
-  <em>Menu bar day timeline · Fullscreen “Скоро встреча” alert</em>
+  <em>Таймлайн дня в menu bar · Полноэкранный алерт «Скоро встреча»</em>
 </p>
 
 ---
 
-## What it does
+## Возможности
 
-| Feature | Details |
+| Функция | Описание |
 |--------|---------|
-| Menu bar timeline | Day view of your meetings, side‑by‑side columns for overlaps, click a meeting for details |
-| Fullscreen alerts | Unmissable overlay ~1 minute before start (snooze 5/10 min, pause, dismiss) |
-| Calendar sync | EventKit **or** direct Exchange EWS (switch in Settings) |
-| Local cache | Exchange events show instantly from cache; refresh runs in the background |
-| Join meeting | Detects conference links; **ChatZone / Meetzone** opens in the ChatZone desktop app |
-| Launch at login | Registered as a login item by default (toggle in Settings) |
-| Privacy‑first | Calendar data stays on your Mac — passwords in Keychain, no cloud sync of events |
+| Таймлайн в menu bar | Встречи на день, колонки при пересечениях, клик по встрече — детали |
+| Полноэкранные алерты | Непропускаемый оверлей ~за 1 минуту до начала (отложить 5/10 мин, пауза, закрыть) |
+| Синхронизация календаря | EventKit **или** прямой Exchange EWS (переключатель в настройках) |
+| Локальный кеш | События Exchange сразу из кеша; обновление — в фоне |
+| Подключение к встрече | Детект ссылок; **ChatZone / Meetzone** открывается в десктопном ChatZone |
+| Запуск при входе | Login item по умолчанию (можно отключить в настройках) |
+| Приватность | Данные календаря остаются на Mac — пароли в Keychain, без облачной синхронизации событий |
 
 ---
 
-## Requirements
+## Требования
 
 - macOS **14+**
-- **Xcode** (recommended) or Command Line Tools with Swift 5.9+
-- For EventKit: calendars in the system **Calendar** app
-- For Exchange EWS: corporate login + `код:пароль` from **@mail-bot** in Chatzone
+- **Xcode** (рекомендуется) или Command Line Tools со Swift 5.9+
+- Для EventKit: календари в системном приложении **«Календарь»**
+- Для Exchange EWS: корпоративный логин + `код:пароль` от **@mail-bot** в Chatzone
 
 ---
 
-## Install (DMG)
+## Установка (DMG)
 
-1. Download the latest `Inface-*.dmg` from [Releases](https://github.com/stAndrei/inface/releases) (or build one locally — see below).
-2. Open the DMG and drag **Inface** into **Applications**.
-3. Launch Inface.
-4. If Gatekeeper blocks it (ad‑hoc signature): right‑click → **Open**, or allow it in **System Settings → Privacy & Security**.
-5. Connect a calendar (EventKit permission **or** Exchange login — see below).
-6. Click the calendar icon in the menu bar.
+1. Скачайте последний `Inface-*.dmg` из [Releases](https://github.com/stAndrei/inface/releases) (или соберите локально — см. ниже).
+2. Откройте DMG и перетащите **Inface** в **Программы**.
+3. Запустите Inface.
+4. Если Gatekeeper блокирует (ad‑hoc подпись): правый клик → **Открыть**, или разрешите в **Системные настройки → Конфиденциальность и безопасность**.
+5. Подключите календарь (доступ EventKit **или** вход в Exchange — см. ниже).
+6. Нажмите иконку календаря в строке меню.
 
-Optional: keep **Launch at login** enabled (default) so Inface starts when you sign in.
+По желанию оставьте **«Запускать при входе»** (включено по умолчанию).
 
 ---
 
-## Connect Exchange (EWS)
+## Подключение Exchange (EWS)
 
-1. Open Inface → **⚙️ / Настройки** (or **⌘,**).
+1. Откройте Inface → **⚙️ / Настройки** (или **⌘,**).
 2. **Календарь → Источник → Exchange (EWS)**.
-3. **Логин:** `имя@ozon.ru` (example: `petrovan@ozon.ru`).
-4. **Пароль:** string `КОД:ПАРОЛЬ` from **@mail-bot** in Chatzone (not your account password alone).
-5. Tap **Войти**. Default server: `https://mailsec.o3t.ru/EWS/Exchange.asmx`.
+3. **Логин:** `имя@ozon.ru` (например, `petrovan@ozon.ru`).
+4. **Пароль:** строка `КОД:ПАРОЛЬ` из **@mail-bot** в Chatzone (не только пароль учётки).
+5. Нажмите **Войти**. Сервер по умолчанию: `https://mailsec.o3t.ru/EWS/Exchange.asmx`.
 
-After password rotation (~every 3 months), get a new code from @mail-bot and update the password field.
-
----
-
-## How to use
-
-1. **Menu bar icon** — open the popover to see today’s (or another day’s) timeline.
-2. **Day switcher** — previous / next day, or jump to Today.
-3. **Meeting card** — click a block for title, time, location, notes, and join link.
-4. **Join** — **Подключиться** opens the meeting link (ChatZone Meetzone UUID links open in ChatZone.app).
-5. **Quit** — **Выйти** in the popover footer closes Inface.
-6. **Alert** — when a meeting is about to start, a fullscreen sheet appears:
-   - join / dismiss / snooze / pause alerts
-7. **Settings**:
-   - calendar source (EventKit / Exchange)
-   - lead time (minutes)
-   - pause alerts
-   - launch at login
+После смены пароля учётки (~раз в 3 месяца) получите новый код у @mail-bot и обновите поле пароля.
 
 ---
 
-## Build from source
+## Как пользоваться
+
+1. **Иконка в menu bar** — откройте popover со списком встреч на сегодня (или другой день).
+2. **Переключатель дня** — предыдущий / следующий день или «Сегодня».
+3. **Карточка встречи** — клик по блоку: название, время, место, заметки, ссылка.
+4. **Подключиться** — открывает ссылку на встречу (UUID Meetzone — в ChatZone.app).
+5. **Выйти** — внизу popover полностью закрывает Inface.
+6. **Алерт** — перед началом встречи полноэкранный экран:
+   - подключиться / закрыть / отложить / пауза алертов
+7. **Настройки**:
+   - источник календаря (EventKit / Exchange)
+   - за сколько минут предупреждать
+   - пауза оповещений
+   - запуск при входе в систему
+
+---
+
+## Сборка из исходников
 
 ```bash
 git clone https://github.com/stAndrei/inface.git
 cd inface
 
-# Prefer full Xcode toolchain
+# Предпочтительно полный toolchain Xcode
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-# or: ./Scripts/use-xcode.sh
+# или: ./Scripts/use-xcode.sh
 
 swift test
 ./Scripts/package-app.sh
 open dist/Inface.app
 ```
 
-### Shareable DMG
+### DMG для раздачи
 
 ```bash
 ./Scripts/package-dmg.sh
 # → dist/Inface-<version>.dmg
 ```
 
-Reload a running local build:
+Перезапуск локальной сборки:
 
 ```bash
 ./Scripts/reload-app.sh
@@ -121,22 +121,22 @@ Reload a running local build:
 
 ---
 
-## Project layout
+## Структура проекта
 
-- `Sources/InfaceCore` — calendar (EventKit + EWS), alerts, link detection, cache
-- `Sources/InfaceApp` — SwiftUI menu bar UI + fullscreen presenter
-- `Scripts/package-app.sh` / `package-dmg.sh` / `reload-app.sh` — packaging & local reload
-- `openspec/` — product specs and change history
-- `AGENTS.md` — local multi‑agent workflow notes
-
----
-
-## Privacy
-
-Inface requests **Calendar** access only when using EventKit. Exchange credentials are stored in the macOS **Keychain**. Events are not uploaded. Meeting links are opened locally via `NSWorkspace` / ChatZone deep links.
+- `Sources/InfaceCore` — календарь (EventKit + EWS), алерты, детект ссылок, кеш
+- `Sources/InfaceApp` — SwiftUI UI в menu bar и полноэкранный презентер
+- `Scripts/package-app.sh` / `package-dmg.sh` / `reload-app.sh` — упаковка и локальный reload
+- `openspec/` — продуктовые спеки и история change’ей
+- `AGENTS.md` — заметки по локальному multi‑agent workflow
 
 ---
 
-## License
+## Приватность
 
-MIT — see [LICENSE](LICENSE).
+Доступ к **Календарю** запрашивается только в режиме EventKit. Учётные данные Exchange хранятся в **Keychain** macOS. События никуда не отправляются. Ссылки на встречи открываются локально через `NSWorkspace` / deep link ChatZone.
+
+---
+
+## Лицензия
+
+MIT — см. [LICENSE](LICENSE).

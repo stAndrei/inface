@@ -8,14 +8,12 @@ final class AlertWindowController {
 
     init(
         event: MeetingEvent,
-        meetingURL: URL?,
         onJoin: @escaping () -> Void,
         onDismiss: @escaping () -> Void,
         onSnooze: @escaping (Int) -> Void
     ) {
         rootView = AlertContentView(
             event: event,
-            hasMeetingLink: meetingURL != nil,
             onJoin: onJoin,
             onDismiss: onDismiss,
             onSnooze: onSnooze
@@ -48,7 +46,6 @@ final class AlertWindowController {
 
 struct AlertContentView: View {
     let event: MeetingEvent
-    let hasMeetingLink: Bool
     let onJoin: () -> Void
     let onDismiss: () -> Void
     let onSnooze: (Int) -> Void
@@ -70,10 +67,8 @@ struct AlertContentView: View {
                     .font(.title3)
                     .foregroundStyle(InfaceTheme.textSecondary)
                 HStack(spacing: 12) {
-                    if hasMeetingLink {
-                        Button("Подключиться", action: onJoin)
-                            .buttonStyle(AlertPrimaryButtonStyle())
-                    }
+                    Button("Подключиться", action: onJoin)
+                        .buttonStyle(AlertPrimaryButtonStyle())
                     Button("Закрыть", action: onDismiss)
                         .buttonStyle(AlertSecondaryButtonStyle())
                     Button("Отложить 5 мин") { onSnooze(5) }

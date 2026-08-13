@@ -4,6 +4,7 @@ import SwiftUI
 struct DayTimelineView: View {
     let timeline: DayTimelineModel
     let now: Date
+    var isLoading: Bool = false
     let onSelect: (MeetingEvent) -> Void
 
     private let gutterWidth: CGFloat = 64
@@ -12,7 +13,13 @@ struct DayTimelineView: View {
 
     var body: some View {
         Group {
-            if timeline.laidOutMeetings.isEmpty {
+            if isLoading {
+                Text("Загружаем…")
+                    .font(.title3)
+                    .foregroundStyle(InfaceTheme.textSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, 18)
+            } else if timeline.laidOutMeetings.isEmpty {
                 Text("Нет встреч в этот день")
                     .font(.title3)
                     .foregroundStyle(InfaceTheme.textSecondary)

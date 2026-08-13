@@ -66,7 +66,7 @@ public struct MeetingLinkDetector: Sendable {
         guard !candidates.isEmpty else { return nil }
 
         if let uuidMeet = candidates.first(where: isChatZoneMeetUUID) {
-            return uuidMeet
+            return httpsURL(from: uuidMeet)
         }
 
         if let strong = candidates.first(where: { !isWeakChatZoneURL($0) }) {
@@ -133,13 +133,17 @@ public struct MeetingLinkDetector: Sendable {
     }
 
     /// Normalize mattermost/chatzone deep links back to https for safe browser fallback.
+    /// Calendar often stores `/meetzone/{uuid}`; ChatZone only resolves `/meet/{uuid}`
+    /// (unknown paths fall back to `/meet/town-square`).
     public func httpsURL(from url: URL) -> URL {
-        let scheme = url.scheme?.lowercased()
-        guard scheme == "mattermost" || scheme == "chatzone" else { return url }
+        let working = urlWithHTTPSScheme(url)
+        guard isChatZoneMeetUUID(working) else { return working }
 
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false) ?? URLComponents()
-        components.scheme = "https"
-        return components.url ?? url
+        var components = URLComponents(url: working, resolvingAgainstBaseURL: false) ?? URLComponents()
+        let slug = chatZoneMeetSlug(from: working)
+        guard !slug.isEmpty else { return working }
+        components.path = "/meet/\(slug)"
+        return components.url ?? working
     }
 
     public func isChatZoneRelated(_ url: URL) -> Bool {
@@ -157,7 +161,7 @@ public struct MeetingLinkDetector: Sendable {
     }
 
     public func isChatZoneMeetUUID(_ url: URL) -> Bool {
-        let url = httpsURL(from: url)
+        let url = urlWithHTTPSScheme(url)
         guard let host = url.host?.lowercased() else { return false }
         guard isChatZoneHost(host) || host == "msg.o3.ru" || host == "msg-beta.o3.ru" else { return false }
 
@@ -183,11 +187,23 @@ public struct MeetingLinkDetector: Sendable {
         return true
     }
 
+    private func urlWithHTTPSScheme(_ url: URL) -> URL {
+        let scheme = url.scheme?.lowercased()
+        guard scheme == "mattermost" || scheme == "chatzone" else { return url }
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false) ?? URLComponents()
+        components.scheme = "https"
+        return components.url ?? url
+    }
+
     private func chatZoneMeetSlug(from url: URL) -> String {
         let path = url.path
-        guard path.hasPrefix("/meet/") else { return "" }
-        let remainder = String(path.dropFirst("/meet/".count))
-        return remainder.split(separator: "/").first.map(String.init) ?? ""
+        let lower = path.lowercased()
+        for prefix in ["/meetzone/", "/meet/"] {
+            guard lower.hasPrefix(prefix) else { continue }
+            let remainder = String(path.dropFirst(prefix.count))
+            return remainder.split(separator: "/").first.map(String.init) ?? ""
+        }
+        return ""
     }
 
     public func isChatZoneHost(_ host: String) -> Bool {

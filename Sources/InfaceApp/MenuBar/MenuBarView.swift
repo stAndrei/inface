@@ -168,6 +168,7 @@ struct MenuBarView: View {
     }
 
     private var daySubtitle: String {
+        if model.isLoadingSelectedDay { return "загружаем…" }
         let count = model.selectedDayEvents.count
         if count == 0 { return "нет встреч" }
         return "\(count) \(meetingsWord(count))"
@@ -238,6 +239,7 @@ struct MenuBarView: View {
                     day: model.selectedDay
                 ),
                 now: Date(),
+                isLoading: model.isLoadingSelectedDay,
                 onSelect: { event in
                     withAnimation(.easeInOut(duration: 0.18)) {
                         selectedEvent = event

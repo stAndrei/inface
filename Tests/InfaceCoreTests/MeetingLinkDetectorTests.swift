@@ -125,4 +125,57 @@ final class MeetingLinkDetectorTests: XCTestCase {
         XCTAssertEqual(launch.path, "/meet/abc")
         XCTAssertTrue(launch.query?.contains("showMeetInApp=true") == true)
     }
+
+    func testDetectsChatZoneMeetzonePathAndCanonicalizesToMeet() {
+        let event = MeetingEvent(
+            id: "cz-meetzone",
+            title: "Синк",
+            startDate: Date(),
+            endDate: Date().addingTimeInterval(1800),
+            calendarId: "c",
+            calendarTitle: "Work",
+            notes: "https://chatzone.o3t.ru/meetzone/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8"
+        )
+        let url = detector.detect(in: event)
+        XCTAssertEqual(url?.host, "chatzone.o3t.ru")
+        XCTAssertEqual(url?.path, "/meet/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8")
+    }
+
+    func testPrefersMeetzoneUUIDOverTownSquareFallback() {
+        let event = MeetingEvent(
+            id: "cz-meetzone-exchange",
+            title: "Синк",
+            startDate: Date(),
+            endDate: Date().addingTimeInterval(1800),
+            calendarId: "c",
+            calendarTitle: "Work",
+            notes: "https://chatzone.o3t.ru/meetzone/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8",
+            url: URL(string: "https://chatzone.o3t.ru/meet/town-square")
+        )
+        let url = detector.detect(in: event)
+        XCTAssertEqual(url?.path, "/meet/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8")
+    }
+
+    func testMeetzoneLaunchURLRewritesToMeetDeepLink() {
+        let https = URL(string: "https://chatzone.o3t.ru/meetzone/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8")!
+        XCTAssertTrue(detector.isConferenceURL(https))
+        let launch = detector.launchURL(for: https)
+        XCTAssertEqual(launch.scheme, "mattermost")
+        XCTAssertEqual(launch.host, "chatzone.o3t.ru")
+        XCTAssertEqual(launch.path, "/meet/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8")
+        XCTAssertTrue(launch.query?.contains("showMeetInApp=true") == true)
+    }
+
+    func testHttpsURLCanonicalizesMeetzonePath() {
+        let meetzone = URL(string: "https://chatzone.o3t.ru/meetzone/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8")!
+        let https = detector.httpsURL(from: meetzone)
+        XCTAssertEqual(https.scheme, "https")
+        XCTAssertEqual(https.path, "/meet/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8")
+    }
+
+    func testIgnoresMeetzoneWithoutUUID() {
+        let url = URL(string: "https://chatzone.o3t.ru/meetzone/town-square")!
+        XCTAssertFalse(detector.isConferenceURL(url))
+        XCTAssertTrue(detector.isWeakChatZoneURL(url))
+    }
 }

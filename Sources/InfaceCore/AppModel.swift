@@ -7,6 +7,7 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var authStatus: CalendarAuthStatus
     @Published public private(set) var events: [MeetingEvent] = []
     @Published public private(set) var isRefreshing = false
+    @Published public private(set) var hasCompletedInitialFetch = false
     @Published public var selectedDay: Date
     @Published public var settings: AppSettings {
         didSet {
@@ -109,6 +110,13 @@ public final class AppModel: ObservableObject {
             .sorted { $0.startDate < $1.startDate }
     }
 
+    /// True while the selected day has no meetings yet because a fetch is still in flight.
+    public var isLoadingSelectedDay: Bool {
+        guard authStatus == .authorized else { return false }
+        guard selectedDayEvents.isEmpty else { return false }
+        return isRefreshing || !hasCompletedInitialFetch
+    }
+
     /// Remaining meetings for today (alerts / compatibility).
     public var todaysRemainingEvents: [MeetingEvent] {
         let cal = Calendar.current
@@ -199,6 +207,8 @@ public final class AppModel: ObservableObject {
             try calendarRouter.exchange.logout()
             authStatus = calendarRouter.authorizationStatus
             events = []
+            hasCompletedInitialFetch = false
+            isRefreshing = false
             eventsCache.clear(source: .exchange)
             lastError = nil
         } catch {
@@ -215,6 +225,8 @@ public final class AppModel: ObservableObject {
         authStatus = calendarRouter.authorizationStatus
         guard authStatus == .authorized else {
             events = []
+            hasCompletedInitialFetch = false
+            isRefreshing = false
             return
         }
 
@@ -227,6 +239,8 @@ public final class AppModel: ObservableObject {
                 isRefreshing = false
             } catch {
                 lastError = EWSErrorLocalized.message(for: error)
+                isRefreshing = false
+                hasCompletedInitialFetch = true
             }
             return
         }
@@ -256,6 +270,7 @@ public final class AppModel: ObservableObject {
                     self.lastError = EWSErrorLocalized.message(for: error)
                     self.authStatus = self.calendarRouter.authorizationStatus
                     self.isRefreshing = false
+                    self.hasCompletedInitialFetch = true
                 }
             }
         }
@@ -309,6 +324,17 @@ public final class AppModel: ObservableObject {
         return openLink(url)
     }
 
+    /// Join from the fullscreen alert: open the meeting link and dismiss only if it opened.
+    @discardableResult
+    public func joinActiveAlert() -> Bool {
+        guard let event = activeAlert else { return false }
+        let joined = joinMeeting(for: event)
+        if joined {
+            dismissAlert()
+        }
+        return joined
+    }
+
     public func openLink(_ url: URL) -> Bool {
         linkOpener.open(linkDetector.launchURL(for: url))
     }
@@ -330,12 +356,15 @@ public final class AppModel: ObservableObject {
         authStatus = calendarRouter.authorizationStatus
         if !initial {
             restartObserving()
+            hasCompletedInitialFetch = false
             loadCachedEvents()
             // Don't block Settings UI when switching to Exchange without credentials.
             if authStatus == .authorized {
                 refreshEventsInBackground()
             } else {
                 events = []
+                hasCompletedInitialFetch = false
+                isRefreshing = false
             }
         }
     }
@@ -355,6 +384,7 @@ public final class AppModel: ObservableObject {
         scheduler.updateEvents(fetched.filter { $0.endDate > Date() })
         lastError = nil
         authStatus = calendarRouter.authorizationStatus
+        hasCompletedInitialFetch = true
     }
 
     /// Drop stale Exchange cache that may lack Body/notes from older FindItem-only fetches.

@@ -14,6 +14,7 @@
 - [ ] Exchange: события видны в popover без Calendar.app
 - [ ] Exchange: popover reload при открытии иконки
 - [ ] Exchange: в карточке встречи есть заметки и «Подключиться» на ChatZone Meetzone UUID
+- [ ] «Подключиться» по `chatzone.o3t.ru/meetzone/{uuid}` открывает звонок `/meet/{uuid}`, не town-square
 - [x] Fullscreen алерт за ~1 мин до тестовой встречи
 - [ ] «Подключиться» открывает Teams/Zoom из события
 - [ ] «Пауза» глушит алерты

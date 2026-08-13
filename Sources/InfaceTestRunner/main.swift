@@ -92,6 +92,10 @@ func meetingLinkTests() -> Int {
     let launch = detector.launchURL(for: URL(string: "https://chatzone.o3t.ru/meet/6d54c167-7829-4d3e-80e8-3e0dd626b169")!)
     f += expect(launch.scheme == "mattermost", "chatzone scheme")
     f += expect(launch.query?.contains("showMeetInApp=true") == true, "chatzone showMeetInApp")
+    let meetzone = URL(string: "https://chatzone.o3t.ru/meetzone/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8")!
+    let meetzoneLaunch = detector.launchURL(for: meetzone)
+    f += expect(meetzoneLaunch.path == "/meet/a9f671fd-4e31-4e2c-bd3f-c0e5a6fab0c8", "meetzone rewrites to meet")
+    f += expect(meetzoneLaunch.query?.contains("showMeetInApp=true") == true, "meetzone showMeetInApp")
     return f
 }
 

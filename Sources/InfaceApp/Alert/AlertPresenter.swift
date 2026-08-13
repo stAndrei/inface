@@ -33,10 +33,8 @@ final class AlertPresenter: ObservableObject {
         for screen in NSScreen.screens {
             let controller = AlertWindowController(
                 event: event,
-                meetingURL: model.linkDetector.detect(in: event),
                 onJoin: { [weak self] in
-                    _ = self?.model.joinMeeting(for: event)
-                    self?.model.dismissAlert()
+                    _ = self?.model.joinActiveAlert()
                 },
                 onDismiss: { [weak self] in
                     self?.model.dismissAlert()

@@ -228,6 +228,18 @@ func appModelFunctionalTests() -> Int {
     let joinModel = AppModel(calendar: MockCalendarService(), linkOpener: opener)
     f += expect(joinModel.joinMeeting(for: withLink), "join returns true")
     f += expect(opener.opened.count == 1, "opener called")
+    joinModel.forceAlert(withLink)
+    f += expect(joinModel.joinActiveAlert(), "join active alert")
+    f += expect(joinModel.activeAlert == nil, "alert dismissed after join")
+
+    let noLink = MeetingEvent(
+        id: "fx-offline", title: "Офлайн", startDate: Date().addingTimeInterval(60),
+        endDate: Date().addingTimeInterval(600), calendarId: "c", calendarTitle: "Work"
+    )
+    let noLinkModel = AppModel(calendar: MockCalendarService(), linkOpener: MockLinkOpener())
+    noLinkModel.forceAlert(noLink)
+    f += expect(!noLinkModel.joinActiveAlert(), "join without link fails")
+    f += expect(noLinkModel.activeAlert?.id == "fx-offline", "alert stays without link")
 
     let t0 = Date()
     let schedEvent = MeetingEvent(
@@ -252,5 +264,15 @@ func appModelFunctionalTests() -> Int {
     denied.start()
     f += expect(denied.events.isEmpty, "denied empty")
     f += expect(denied.authStatus == .denied, "denied status")
+    f += expect(!denied.isLoadingSelectedDay, "denied not loading")
+
+    let loading = AppModel(
+        calendar: MockCalendarService(events: []),
+        eventsCache: InMemoryEventsCache()
+    )
+    f += expect(loading.isLoadingSelectedDay, "loading before fetch")
+    loading.start()
+    f += expect(!loading.isLoadingSelectedDay, "not loading after empty fetch")
+    f += expect(loading.hasCompletedInitialFetch, "initial fetch completed")
     return f
 }

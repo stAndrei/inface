@@ -43,5 +43,17 @@ final class EventsCacheAppModelTests: XCTestCase {
         model.presentPopover()
         XCTAssertEqual(model.events.first?.id, "cached")
         XCTAssertEqual(model.events.first?.title, "Из кеша")
+        XCTAssertFalse(model.isLoadingSelectedDay)
+    }
+
+    func testLoadingSelectedDayBeforeFetchWithEmptyCache() {
+        let model = AppModel(
+            calendar: MockCalendarService(events: []),
+            eventsCache: InMemoryEventsCache()
+        )
+        XCTAssertTrue(model.isLoadingSelectedDay)
+        model.start()
+        XCTAssertFalse(model.isLoadingSelectedDay)
+        XCTAssertTrue(model.hasCompletedInitialFetch)
     }
 }
